@@ -13,6 +13,7 @@ export default function HomeTab({
   setIsBalanceShow,
   onSeedData,
   onNavigateToTab,
+  onNavigateToWallet,
   onAddTransactionClick
 }) {
   const formatIDR = (value) => {
@@ -278,7 +279,7 @@ export default function HomeTab({
                 return (
                   <div
                     key={wallet._id || wallet.id}
-                    onClick={() => onNavigateToTab("portfolio")}
+                    onClick={() => onNavigateToWallet(wallet._id || wallet.id)}
                     style={{
                       background: getWalletGradient(wallet.themeId || wallet.color || "ocean"),
                     }}

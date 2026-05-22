@@ -7,22 +7,33 @@ import HomeTab from "./components/HomeTab";
 import AnalyticsTab from "./components/AnalyticsTab";
 import PortfolioTab from "./components/PortfolioTab";
 import ProfileTab from "./components/ProfileTab";
+import WalletDetail from "./components/WalletDetail";
 import SakuVoice from "./components/SakuVoice";
 import SakuSnap from "./components/SakuSnap";
 import TransactionForms from "./components/TransactionForms";
 
 const getTabFromPath = (path) => {
   const cleanPath = path.toLowerCase().replace(/^\/+/, "");
+  if (cleanPath.startsWith("wallet/")) return "wallet-detail";
   if (cleanPath === "analytics") return "analytics";
   if (cleanPath === "portfolio") return "portfolio";
   if (cleanPath === "profile") return "profile";
   return "home";
 };
 
+const getWalletIdFromPath = (path) => {
+  const cleanPath = path.replace(/^\/+/, "");
+  if (cleanPath.startsWith("wallet/")) {
+    return cleanPath.split("/")[1];
+  }
+  return null;
+};
+
 export default function App() {
   // Auth navigation states: 'onboarding' | 'signin' | 'authenticated'
   const [authState, setAuthState] = useState("authenticated");
   const [activeTab, setActiveTab] = useState(() => getTabFromPath(window.location.pathname));
+  const [activeWalletId, setActiveWalletId] = useState(() => getWalletIdFromPath(window.location.pathname));
   const [isBalanceShow, setIsBalanceShow] = useState(true);
 
   // Core Data States
@@ -37,6 +48,8 @@ export default function App() {
   const [showVoice, setShowVoice] = useState(false);
   const [showSnap, setShowSnap] = useState(false);
   const [showManual, setShowManual] = useState(false);
+  const [manualFormInitialWalletId, setManualFormInitialWalletId] = useState(null);
+  const [manualFormInitialType, setManualFormInitialType] = useState(null);
 
   // Routing sync
   useEffect(() => {
@@ -47,7 +60,9 @@ export default function App() {
     }
 
     const handlePopState = () => {
-      setActiveTab(getTabFromPath(window.location.pathname));
+      const path = window.location.pathname;
+      setActiveTab(getTabFromPath(path));
+      setActiveWalletId(getWalletIdFromPath(path));
     };
 
     window.addEventListener("popstate", handlePopState);
@@ -58,9 +73,24 @@ export default function App() {
 
   const handleTabChange = (tabId) => {
     setActiveTab(tabId);
+    setActiveWalletId(null);
     if (window.location.pathname !== "/" + tabId) {
       window.history.pushState(null, "", "/" + tabId);
     }
+  };
+
+  const handleNavigateToWallet = (walletId) => {
+    setActiveTab("wallet-detail");
+    setActiveWalletId(walletId);
+    if (window.location.pathname !== "/wallet/" + walletId) {
+      window.history.pushState(null, "", "/wallet/" + walletId);
+    }
+  };
+
+  const handleTriggerManual = (walletId = null, formType = "manual") => {
+    setManualFormInitialWalletId(walletId);
+    setManualFormInitialType(formType);
+    setShowManual(true);
   };
 
   useEffect(() => {
@@ -327,7 +357,7 @@ export default function App() {
       onLogout={handleLogout}
       onTriggerVoice={() => setShowVoice(true)}
       onTriggerSnap={() => setShowSnap(true)}
-      onTriggerManual={() => setShowManual(true)}
+      onTriggerManual={() => handleTriggerManual(null, "manual")}
     >
       {/* Dynamic Tab Mounting */}
       {activeTab === "home" && (
@@ -342,7 +372,8 @@ export default function App() {
           setIsBalanceShow={setIsBalanceShow}
           onSeedData={handleSeedData}
           onNavigateToTab={handleTabChange}
-          onAddTransactionClick={() => setShowManual(true)}
+          onNavigateToWallet={handleNavigateToWallet}
+          onAddTransactionClick={() => handleTriggerManual(null, "manual")}
         />
       )}
 
@@ -365,6 +396,7 @@ export default function App() {
           onDeleteGoal={handleDeleteGoal}
           isBalanceShow={isBalanceShow}
           setIsBalanceShow={setIsBalanceShow}
+          onNavigateToWallet={handleNavigateToWallet}
         />
       )}
 
@@ -376,6 +408,21 @@ export default function App() {
           onAddCategory={handleAddCategory}
           onDeleteCategory={handleDeleteCategory}
           onLogout={handleLogout}
+        />
+      )}
+
+      {activeTab === "wallet-detail" && (
+        <WalletDetail
+          walletId={activeWalletId}
+          wallets={wallets}
+          transactions={transactions}
+          categories={categories}
+          onDeleteWallet={handleDeleteWallet}
+          onBack={() => handleTabChange("portfolio")}
+          onTriggerManual={handleTriggerManual}
+          isBalanceShow={isBalanceShow}
+          setIsBalanceShow={setIsBalanceShow}
+          onRefreshData={fetchUserData}
         />
       )}
 
@@ -403,7 +450,13 @@ export default function App() {
           wallets={wallets}
           categories={categories}
           onSubmitTransaction={handleSubmitTransaction}
-          onClose={() => setShowManual(false)}
+          onClose={() => {
+            setShowManual(false);
+            setManualFormInitialWalletId(null);
+            setManualFormInitialType(null);
+          }}
+          initialWalletId={manualFormInitialWalletId}
+          initialFormType={manualFormInitialType}
         />
       )}
     </DashboardLayout>

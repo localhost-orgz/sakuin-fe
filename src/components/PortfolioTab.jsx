@@ -11,7 +11,8 @@ export default function PortfolioTab({
   onAddGoal,
   onDeleteGoal,
   isBalanceShow,
-  setIsBalanceShow
+  setIsBalanceShow,
+  onNavigateToWallet
 }) {
   // Modal visibility states
   const [showAddWallet, setShowAddWallet] = useState(false);
@@ -168,7 +169,7 @@ export default function PortfolioTab({
                 return (
                   <div
                     key={wallet._id || wallet.id}
-                    onClick={() => setSelectedWallet(wallet)}
+                    onClick={() => onNavigateToWallet(wallet._id || wallet.id)}
                     style={{
                       background: getWalletGradient(wallet.themeId || "ocean"),
                     }}

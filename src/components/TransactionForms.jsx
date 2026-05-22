@@ -6,9 +6,11 @@ export default function TransactionForms({
   wallets = [],
   categories = [],
   onSubmitTransaction,
-  onClose
+  onClose,
+  initialWalletId = null,
+  initialFormType = null
 }) {
-  const [formType, setFormType] = useState("manual"); // "manual" or "transfer"
+  const [formType, setFormType] = useState(initialFormType || "manual"); // "manual" or "transfer"
   const [txType, setTxType] = useState("expense"); // "expense" or "income" (for manual)
 
   // Manual Form States
@@ -30,16 +32,23 @@ export default function TransactionForms({
   // Set default wallet and category on mount if available
   React.useEffect(() => {
     if (wallets.length > 0) {
-      setWalletId(wallets[0]._id || wallets[0].id);
-      setSourceWalletId(wallets[0]._id || wallets[0].id);
-      if (wallets.length > 1) {
-        setDestWalletId(wallets[1]._id || wallets[1].id);
-      }
+      const activeWallet = initialWalletId || wallets[0]._id || wallets[0].id;
+      setWalletId(activeWallet);
+      setSourceWalletId(activeWallet);
+      
+      const otherWallet = wallets.find(w => w._id !== activeWallet && w.id !== activeWallet) || wallets[0];
+      setDestWalletId(otherWallet._id || otherWallet.id);
     }
     if (categories.length > 0) {
       setCategoryId(categories[0]._id || categories[0].id);
     }
-  }, [wallets, categories]);
+  }, [wallets, categories, initialWalletId]);
+
+  React.useEffect(() => {
+    if (initialFormType) {
+      setFormType(initialFormType);
+    }
+  }, [initialFormType]);
 
   const handleManualSubmit = (e) => {
     e.preventDefault();
