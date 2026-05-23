@@ -7,6 +7,7 @@ import HomeTab from "./components/HomeTab";
 import AnalyticsTab from "./components/AnalyticsTab";
 import PortfolioTab from "./components/PortfolioTab";
 import ProfileTab from "./components/ProfileTab";
+import AllTransactionsTab from "./components/AllTransactionsTab";
 import WalletDetail from "./components/WalletDetail";
 import SakuVoice from "./components/SakuVoice";
 import SakuSnap from "./components/SakuSnap";
@@ -18,6 +19,7 @@ const getTabFromPath = (path) => {
   if (cleanPath === "analytics") return "analytics";
   if (cleanPath === "portfolio") return "portfolio";
   if (cleanPath === "profile") return "profile";
+  if (cleanPath === "transactions") return "transactions";
   return "home";
 };
 
@@ -334,6 +336,18 @@ export default function App() {
     }
   };
 
+  const handleDeleteTransaction = async (txId) => {
+    try {
+      await apiRequest(`/transaction/${txId}`, {
+        method: "DELETE"
+      });
+      setTransactions(prev => prev.filter(t => t._id !== txId && t.id !== txId));
+      fetchUserData();
+    } catch (err) {
+      console.error("Failed to delete transaction:", err);
+    }
+  };
+
   // ─── DUMMY DATA SEEDER ───
   const handleSeedData = async () => {
     if (wallets.length === 0 || categories.length === 0) {
@@ -456,6 +470,15 @@ export default function App() {
           isBalanceShow={isBalanceShow}
           setIsBalanceShow={setIsBalanceShow}
           onNavigateToWallet={handleNavigateToWallet}
+        />
+      )}
+
+      {activeTab === "transactions" && (
+        <AllTransactionsTab
+          transactions={transactions}
+          wallets={wallets}
+          categories={categories}
+          onDeleteTransaction={handleDeleteTransaction}
         />
       )}
 

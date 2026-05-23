@@ -1,5 +1,5 @@
 import React from "react";
-import { Home, BarChart3, Briefcase, User, Mic, Camera, Plus, LogOut, ChevronRight } from "lucide-react";
+import { Home, History, BarChart3, Briefcase, User, Mic, Camera, Plus, LogOut, ChevronRight } from "lucide-react";
 
 export default function DashboardLayout({
   activeTab,
@@ -13,6 +13,7 @@ export default function DashboardLayout({
 }) {
   const tabs = [
     { id: "home", label: "Home", icon: <Home className="w-5 h-5" /> },
+    { id: "transactions", label: "Transactions", icon: <History className="w-5 h-5" /> },
     { id: "analytics", label: "Analytics", icon: <BarChart3 className="w-5 h-5" /> },
     { id: "portfolio", label: "Portfolio", icon: <Briefcase className="w-5 h-5" /> },
     { id: "profile", label: "Profile", icon: <User className="w-5 h-5" /> },
