@@ -153,9 +153,9 @@ export default function HomeTab({
         <div className="max-w-4xl mx-auto flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 relative z-10">
           <div className="flex items-center gap-4">
             <div className="w-16 h-16 rounded-full bg-white/20 border-2 border-white/30 overflow-hidden flex items-center justify-center shadow-md">
-              {user?.avatar_url || user?.avatarUrl ? (
+              {user?.avatar || user?.avatar_url || user?.avatarUrl ? (
                 <img
-                  src={user.avatar_url || user.avatarUrl}
+                  src={user.avatar || user.avatar_url || user.avatarUrl}
                   alt={user.name}
                   className="w-full h-full object-cover"
                 />
@@ -250,7 +250,7 @@ export default function HomeTab({
             </button>
           </div>
 
-          <div className="flex overflow-x-auto gap-4 pb-4 scrollbar-thin">
+          <div className="flex overflow-x-auto gap-4 pb-3 custom-scrollbar">
             {wallets.length === 0 ? (
               <div className="flex-1 border-2 border-dashed border-slate-200 rounded-3xl p-8 text-center text-slate-400 bg-white">
                 No active wallets found.
@@ -392,9 +392,9 @@ export default function HomeTab({
                   No expenses recorded yet.
                 </div>
               ) : (
-                <div className="flex overflow-x-auto gap-4 py-3 scrollbar-thin">
+                <div className="flex overflow-x-auto gap-4 py-2 custom-scrollbar">
                   {topCategoriesData.map((cat) => {
-                    const theme = getWalletTheme(cat.themeId || "ocean");
+                    const theme = getWalletTheme(cat.themeId || cat.color || cat.theme_id || "ocean");
                     return (
                       <div
                         key={cat.id}
@@ -459,7 +459,7 @@ export default function HomeTab({
                 No active goals configured.
               </div>
             ) : (
-              <div className="flex overflow-x-auto gap-4 py-2 scrollbar-thin flex-1 items-center">
+              <div className="flex overflow-x-auto gap-4 py-2 custom-scrollbar flex-1 items-center">
                 {goals.map((goal) => {
                   const percentage = Math.min((goal.current / goal.target) * 100, 100);
                   const isCompleted = percentage >= 100;

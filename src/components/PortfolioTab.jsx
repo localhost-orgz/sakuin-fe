@@ -157,7 +157,7 @@ export default function PortfolioTab({
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
               {wallets.map((wallet) => {
-                const theme = getWalletTheme(wallet.themeId || "ocean");
+                const theme = getWalletTheme(wallet.themeId || wallet.color || "ocean");
                 const isDark =
                   theme.gradientColors[0].startsWith("#0") ||
                   theme.gradientColors[0].startsWith("#1") ||
@@ -171,7 +171,7 @@ export default function PortfolioTab({
                     key={wallet._id || wallet.id}
                     onClick={() => onNavigateToWallet(wallet._id || wallet.id)}
                     style={{
-                      background: getWalletGradient(wallet.themeId || "ocean"),
+                      background: getWalletGradient(wallet.themeId || wallet.color || "ocean"),
                     }}
                     className="rounded-3xl p-5 text-white relative overflow-hidden flex flex-col justify-between h-40 cursor-pointer hover:scale-[1.02] transition-transform duration-200 shadow-md border border-slate-100/10"
                   >
@@ -493,7 +493,7 @@ export default function PortfolioTab({
             <div className="px-6 py-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
               <div className="flex items-center gap-2">
                 <div
-                  style={{ backgroundColor: getWalletTheme(selectedWallet.themeId || "ocean").accentColor }}
+                  style={{ backgroundColor: getWalletTheme(selectedWallet.themeId || selectedWallet.color || "ocean").accentColor }}
                   className="w-4 h-4 rounded-md"
                 />
                 <h3 className="font-extrabold text-base text-slate-800">Wallet Profile: {selectedWallet.name}</h3>
@@ -541,7 +541,7 @@ export default function PortfolioTab({
                     <p className="text-slate-400 text-xs font-semibold">No transactions recorded under this account.</p>
                   </div>
                 ) : (
-                  <div className="max-h-48 overflow-y-auto divide-y divide-slate-100 border border-slate-100 rounded-2xl bg-white scrollbar-thin">
+                  <div className="max-h-48 overflow-y-auto divide-y divide-slate-100 border border-slate-100 rounded-2xl bg-white custom-scrollbar">
                     {transactions
                       .filter(t => t.wallet_id === (selectedWallet._id || selectedWallet.id))
                       .map(tx => {

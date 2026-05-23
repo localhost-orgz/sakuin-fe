@@ -4,7 +4,12 @@ import authImage2 from "../assets/auth-image2.png";
 
 export default function SignIn({ onLogin }) {
   const handleGoogleLogin = () => {
-    // Generate a mock token and store in local storage to simulate authentication
+    const redirectUri = encodeURIComponent(window.location.origin + "/home");
+    const authUrl = `https://sakuin-be.vercel.app/auth/google?redirect_uri=${redirectUri}`;
+    window.location.href = authUrl;
+  };
+
+  const handleBypassLogin = () => {
     localStorage.setItem("user_token", "mock_token_sakuin_web_2026");
     onLogin();
   };
@@ -77,7 +82,7 @@ export default function SignIn({ onLogin }) {
 
             {/* Direct Bypass Button */}
             <button
-              onClick={handleGoogleLogin}
+              onClick={handleBypassLogin}
               className="w-full bg-[#00bf71] hover:bg-[#00a862] text-white font-extrabold py-3.5 px-6 rounded-2xl shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/35 transition-all active:scale-[0.98] text-xs cursor-pointer"
             >
               Bypass & Enter Workspace

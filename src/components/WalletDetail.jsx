@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useCallback } from "react";
 import { ChevronLeft, MoreHorizontal, Plus, ArrowRightLeft, Search, TrendingUp, TrendingDown, Wallet, Edit2, Trash2, X, Check } from "lucide-react";
 import { getWalletGradient, getWalletTheme, getWalletThemeIds } from "../hooks/useWalletTheme";
 import { apiRequest } from "../utils/api";
@@ -24,10 +24,43 @@ export default function WalletDetail({
   const [editThemeId, setEditThemeId] = useState("ocean");
   const [isSaving, setIsSaving] = useState(false);
 
-  // Find target wallet
-  const wallet = useMemo(() => {
+  // Find initial wallet from props
+  const initialWallet = useMemo(() => {
     return wallets.find(w => w._id === walletId || w.id === walletId);
   }, [wallets, walletId]);
+
+  // Local state to store fetched wallet details
+  const [wallet, setWallet] = useState(initialWallet);
+  const [localTransactions, setLocalTransactions] = useState([]);
+  const [loading, setLoading] = useState(!initialWallet);
+
+  // Sync with prop update
+  useEffect(() => {
+    if (initialWallet) {
+      setWallet(initialWallet);
+    }
+  }, [initialWallet]);
+
+  // Fetch wallet details from API
+  const fetchWalletDetail = useCallback(async () => {
+    try {
+      const response = await apiRequest(`/wallets/${walletId}`);
+      if (response && response.status === "success" && response.data) {
+        setWallet(response.data);
+        if (response.data.transactions) {
+          setLocalTransactions(response.data.transactions);
+        }
+      }
+    } catch (error) {
+      console.error("Failed to fetch wallet detail:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, [walletId]);
+
+  useEffect(() => {
+    fetchWalletDetail();
+  }, [fetchWalletDetail]);
 
   // Load wallet details into edit form states
   useEffect(() => {
@@ -36,6 +69,16 @@ export default function WalletDetail({
       setEditThemeId(wallet.themeId || wallet.color || "ocean");
     }
   }, [wallet]);
+
+  // Loading state
+  if (loading && !wallet) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-slate-500 bg-[#f5f6fa] min-h-screen">
+        <div className="w-10 h-10 border-4 border-[#00bf71] border-t-transparent rounded-full animate-spin mb-4" />
+        <p className="text-sm font-semibold">Memuat detail dompet...</p>
+      </div>
+    );
+  }
 
   // If wallet is deleted or not found
   if (!wallet) {
@@ -56,26 +99,35 @@ export default function WalletDetail({
   const themeId = wallet.themeId || wallet.color || "forest";
   const { theme } = { theme: getWalletTheme(themeId) };
 
+  // Select transactions to display
+  const activeTransactions = useMemo(() => {
+    if (localTransactions.length > 0) {
+      return localTransactions;
+    }
+    return transactions.filter(t => t.wallet_id === wallet._id || t.wallet_id === wallet.id);
+  }, [localTransactions, transactions, wallet]);
+
   // Calculate calculations
   const totalIn = useMemo(() => {
-    return transactions
-      .filter(t => (t.wallet_id === wallet._id || t.wallet_id === wallet.id) && t.type === "income")
+    return activeTransactions
+      .filter(t => t.type === "income")
       .reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
-  }, [transactions, wallet]);
+  }, [activeTransactions]);
 
   const totalOut = useMemo(() => {
-    return transactions
-      .filter(t => (t.wallet_id === wallet._id || t.wallet_id === wallet.id) && t.type === "expense")
+    return activeTransactions
+      .filter(t => t.type === "expense")
       .reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
-  }, [transactions, wallet]);
+  }, [activeTransactions]);
 
   // Filter transactions
   const filteredTransactions = useMemo(() => {
-    const allTxs = transactions.filter(t => t.wallet_id === wallet._id || t.wallet_id === wallet.id);
-    if (!search.trim()) return allTxs;
+    if (!search.trim()) return activeTransactions;
     const q = search.toLowerCase();
-    return allTxs.filter(tx => tx.name.toLowerCase().includes(q) || (tx.description && tx.description.toLowerCase().includes(q)));
-  }, [transactions, wallet, search]);
+    return activeTransactions.filter(
+      tx => tx.name.toLowerCase().includes(q) || (tx.description && tx.description.toLowerCase().includes(q))
+    );
+  }, [activeTransactions, search]);
 
   // Group transactions by date
   const groupedTransactions = useMemo(() => {
@@ -135,6 +187,7 @@ export default function WalletDetail({
       if (response && response.status === "success") {
         setShowSettings(false);
         if (onRefreshData) await onRefreshData();
+        await fetchWalletDetail();
       } else {
         alert("Gagal memperbarui dompet.");
       }

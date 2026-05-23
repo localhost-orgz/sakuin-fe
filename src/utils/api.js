@@ -51,6 +51,12 @@ const setLocalData = (key, data) => {
   localStorage.setItem(key, JSON.stringify(data));
 };
 
+let globalAuthFailureHandler = null;
+
+export function registerAuthFailureHandler(handler) {
+  globalAuthFailureHandler = handler;
+}
+
 export async function apiRequest(endpoint, {
   method = "GET",
   query = {},
@@ -64,6 +70,10 @@ export async function apiRequest(endpoint, {
   const url = `${BASE_URL}${endpoint}${queryString}`;
   const token = localStorage.getItem("user_token");
 
+  if (token === "mock_token_sakuin_web_2026" || endpoint.startsWith("/goals")) {
+    return handleOfflineFallback(endpoint, method, body);
+  }
+
   const headers = isFormData
     ? { ...customHeaders }
     : { "Content-Type": "application/json", ...customHeaders };
@@ -75,29 +85,31 @@ export async function apiRequest(endpoint, {
   const options = { method, headers };
   if (body) options.body = isFormData ? body : JSON.stringify(body);
 
+  let res;
   try {
-    const res = await fetch(url, options);
-
-    let data;
-    try {
-      data = await res.json();
-    } catch (jsonErr) {
-      data = {};
-    }
-
-    if (!res.ok) {
-      if (res.status === 401) {
-        localStorage.removeItem("user_token");
-        if (onAuthFailure) onAuthFailure();
-      }
-      throw new Error(data.message || "Request failed");
-    }
-
-    return data;
-  } catch (err) {
-    console.warn(`API ${method} ${endpoint} failed. Using offline localStorage fallback.`, err);
+    res = await fetch(url, options);
+  } catch (fetchErr) {
+    console.warn(`API ${method} ${endpoint} network failed. Using offline localStorage fallback.`, fetchErr);
     return handleOfflineFallback(endpoint, method, body);
   }
+
+  let data;
+  try {
+    data = await res.json();
+  } catch (jsonErr) {
+    data = {};
+  }
+
+  if (!res.ok) {
+    if (res.status === 401) {
+      localStorage.removeItem("user_token");
+      if (onAuthFailure) onAuthFailure();
+      if (globalAuthFailureHandler) globalAuthFailureHandler();
+    }
+    throw new Error(data.message || "Request failed");
+  }
+
+  return data;
 }
 
 // Local Storage Offline Fallback Handler

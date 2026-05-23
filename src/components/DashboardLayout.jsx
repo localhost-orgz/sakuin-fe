@@ -85,7 +85,7 @@ export default function DashboardLayout({
         <div className="border-t border-slate-100 pt-4 flex items-center justify-between px-1">
           <div className="flex items-center gap-3">
             <img
-              src={user?.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80"}
+              src={user?.avatar || user?.avatar_url || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80"}
               alt="avatar"
               className="w-10 h-10 rounded-full object-cover border border-slate-200"
             />

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { User, Mail, Link, Plus, Trash2, ShieldAlert, LogOut, Check, ArrowRight, GitFork, Code, Sparkles, X } from "lucide-react";
 import { getWalletThemeIds, getWalletTheme } from "../hooks/useWalletTheme";
 
@@ -15,15 +15,39 @@ export default function ProfileTab({
   const [email, setEmail] = useState(user?.email || "user@sakuin.com");
   const [avatar, setAvatar] = useState(user?.avatar || "");
 
+  useEffect(() => {
+    if (user) {
+      setName(user.name || "Sakuin User");
+      setEmail(user.email || "user@sakuin.com");
+      setAvatar(user.avatar || user.avatar_url || "");
+    }
+  }, [user]);
+
   // Category Form State
   const [showAddCat, setShowAddCat] = useState(false);
   const [catName, setCatName] = useState("");
   const [catEmoticon, setCatEmoticon] = useState("🏷️");
   const [catThemeId, setCatThemeId] = useState("indigo");
 
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (file.size > 2 * 1024 * 1024) {
+      alert("Ukuran gambar melebihi batas 2MB!");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setAvatar(reader.result);
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleProfileSubmit = (e) => {
     e.preventDefault();
-    onUpdateProfile({ name, email, avatar });
+    onUpdateProfile({ name, email, avatar, avatar_url: avatar });
     setIsEditing(false);
   };
 
@@ -85,7 +109,7 @@ export default function ProfileTab({
                 onClick={() => {
                   setName(user?.name || "Sakuin User");
                   setEmail(user?.email || "user@sakuin.com");
-                  setAvatar(user?.avatar || "");
+                  setAvatar(user?.avatar || user?.avatar_url || "");
                   setIsEditing(false);
                 }}
                 className="text-slate-400 hover:text-slate-600 font-extrabold px-3 py-1.5 text-xs transition-all cursor-pointer"
@@ -98,7 +122,7 @@ export default function ProfileTab({
           {!isEditing ? (
             <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6">
               <img
-                src={user?.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80"}
+                src={user?.avatar || user?.avatar_url || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80"}
                 alt="Avatar preview"
                 className="w-20 h-20 rounded-full object-cover border-4 border-slate-100 shadow-sm"
                 onError={(e) => {
@@ -124,7 +148,48 @@ export default function ProfileTab({
               </button>
             </div>
           ) : (
-            <form onSubmit={handleProfileSubmit} className="space-y-5">
+            <form onSubmit={handleProfileSubmit} className="space-y-6">
+              {/* Avatar upload/preview row */}
+              <div className="flex flex-col sm:flex-row items-center gap-6 pb-2 text-slate-700">
+                <div className="relative group w-24 h-24 shrink-0">
+                  <img
+                    src={avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80"}
+                    alt="Profile Avatar"
+                    className="w-24 h-24 rounded-full object-cover border-4 border-slate-100 shadow-md transition-all group-hover:brightness-90"
+                    onError={(e) => {
+                      e.target.src = "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80";
+                    }}
+                  />
+                  {/* Invisible file input triggered by hover layer */}
+                  <label className="absolute inset-0 rounded-full bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer text-white text-[9px] font-bold uppercase tracking-wider text-center px-2">
+                    Ubah Foto
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleFileChange}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
+                
+                <div className="text-left space-y-1">
+                  <h4 className="font-extrabold text-sm text-slate-700">Foto Profil</h4>
+                  <p className="text-[10px] text-slate-400 leading-normal font-bold">
+                    Pilih file gambar JPEG atau PNG dari perangkat Anda. Ukuran maks 2MB.
+                  </p>
+                  {/* Upload button wrapper */}
+                  <label className="mt-2.5 inline-flex items-center justify-center px-4 py-2 border-2 border-slate-200 hover:border-[#00bf71] bg-white rounded-full text-[10px] font-extrabold text-slate-500 hover:text-[#00bf71] cursor-pointer transition-all active:scale-[0.98]">
+                    Pilih File Gambar
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleFileChange}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest block text-left pl-1">Full Name</label>
@@ -147,17 +212,6 @@ export default function ProfileTab({
                     className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-4 py-3 text-xs focus:outline-none focus:border-[#00bf71] text-slate-700 font-semibold transition-all"
                   />
                 </div>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest block text-left pl-1">Profile Image URL</label>
-                <input
-                  type="text"
-                  placeholder="Insert image link URL"
-                  value={avatar}
-                  onChange={(e) => setAvatar(e.target.value)}
-                  className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-4 py-3 text-xs focus:outline-none focus:border-[#00bf71] text-slate-700 transition-all"
-                />
               </div>
 
               <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
@@ -275,7 +329,7 @@ export default function ProfileTab({
           {/* Categories Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
             {categories.map((cat) => {
-              const theme = getWalletTheme(cat.themeId || "ocean");
+              const theme = getWalletTheme(cat.themeId || cat.color || cat.theme_id || "ocean");
               return (
                 <div
                   key={cat._id || cat.id}

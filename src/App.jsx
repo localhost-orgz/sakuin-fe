@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { apiRequest } from "./utils/api";
+import { apiRequest, registerAuthFailureHandler } from "./utils/api";
 import WelcomeOnboarding from "./components/WelcomeOnboarding";
 import SignIn from "./components/SignIn";
 import DashboardLayout from "./components/DashboardLayout";
@@ -30,8 +30,8 @@ const getWalletIdFromPath = (path) => {
 };
 
 export default function App() {
-  // Auth navigation states: 'onboarding' | 'signin' | 'authenticated'
-  const [authState, setAuthState] = useState("authenticated");
+  // Auth navigation states: 'onboarding' | 'signin' | 'authenticated' | 'loading'
+  const [authState, setAuthState] = useState("loading");
   const [activeTab, setActiveTab] = useState(() => getTabFromPath(window.location.pathname));
   const [activeWalletId, setActiveWalletId] = useState(() => getWalletIdFromPath(window.location.pathname));
   const [isBalanceShow, setIsBalanceShow] = useState(true);
@@ -93,24 +93,81 @@ export default function App() {
     setShowManual(true);
   };
 
+  const handleAuthFail = () => {
+    console.warn("Auth token rejected by API. Redirecting to login.");
+    localStorage.removeItem("user_token");
+    setAuthState("signin");
+    setUser(null);
+    setWallets([]);
+    setTransactions([]);
+    setCategories([]);
+    setGoals([]);
+  };
+
+  // Register the global auth failure handler
   useEffect(() => {
-    fetchUserData();
+    registerAuthFailureHandler(handleAuthFail);
+  }, []);
+
+  // Auth state verification on mount
+  useEffect(() => {
+    async function verifyAuth() {
+      // 1. Intercept Token from redirection URL query parameters
+      const params = new URLSearchParams(window.location.search);
+      const tokenFromUrl = params.get("token");
+      
+      let token = tokenFromUrl;
+      if (tokenFromUrl) {
+        localStorage.setItem("user_token", tokenFromUrl);
+        // Scrub query parameter from the browser URL to keep it clean
+        params.delete("token");
+        const newSearch = params.toString();
+        const cleanUrl = window.location.origin + window.location.pathname + (newSearch ? `?${newSearch}` : "");
+        window.history.replaceState(null, "", cleanUrl);
+      } else {
+        token = localStorage.getItem("user_token");
+      }
+
+      // 2. Check if onboarding seen
+      const onboardingSeen = localStorage.getItem("sakuin_onboarding_seen") === "true";
+      if (!onboardingSeen) {
+        setAuthState("onboarding");
+        return;
+      }
+
+      // 3. Check if token exists, otherwise show signin
+      if (!token) {
+        setAuthState("signin");
+        return;
+      }
+
+      // 4. Token exists, verify token & load dashboard data
+      try {
+        const success = await fetchUserData();
+        if (success) {
+          setAuthState("authenticated");
+        } else {
+          setAuthState("signin");
+        }
+      } catch (err) {
+        console.error("Authentication setup error:", err);
+        setAuthState("signin");
+      }
+    }
+
+    verifyAuth();
   }, []);
 
   // Fetch all user dashboard data
   const fetchUserData = async () => {
     setLoading(true);
     try {
-      const handleAuthFail = () => {
-        console.warn("Auth token rejected by API, falling back to local simulation data.");
-      };
-
       const [userRes, walletsRes, txRes, catRes, goalsRes] = await Promise.all([
-        apiRequest("/auth/profile", { onAuthFailure: handleAuthFail }),
-        apiRequest("/wallets", { onAuthFailure: handleAuthFail }),
-        apiRequest("/transaction", { onAuthFailure: handleAuthFail }),
-        apiRequest("/categories", { onAuthFailure: handleAuthFail }),
-        apiRequest("/goals", { onAuthFailure: handleAuthFail })
+        apiRequest("/auth/profile"),
+        apiRequest("/wallets"),
+        apiRequest("/transaction"),
+        apiRequest("/categories"),
+        apiRequest("/goals")
       ]);
 
       if (userRes?.data) setUser(userRes.data);
@@ -122,8 +179,10 @@ export default function App() {
       }
       if (catRes?.data) setCategories(catRes.data);
       if (goalsRes?.data) setGoals(goalsRes.data);
+      return true;
     } catch (err) {
       console.error("Error loading user dashboard details:", err);
+      return false;
     } finally {
       setLoading(false);
     }
