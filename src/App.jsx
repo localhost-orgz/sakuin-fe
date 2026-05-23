@@ -308,29 +308,11 @@ export default function App() {
   // ─── TRANSACTION SUBMISSION ───
   const handleSubmitTransaction = async (txData) => {
     try {
-      const res = await apiRequest("/transaction", {
+      await apiRequest("/transaction", {
         method: "POST",
         body: txData
       });
-      if (res?.data) {
-        // Prepend new transaction
-        setTransactions(prev => [res.data, ...prev]);
-
-        // Adjust local wallet balance immediately for seamless UX
-        setWallets(prevWallets =>
-          prevWallets.map(w => {
-            if (w._id === txData.wallet_id || w.id === txData.wallet_id) {
-              const currentBal = Number(w.balance);
-              const amt = Number(txData.amount);
-              return {
-                ...w,
-                balance: txData.type === "income" ? currentBal + amt : currentBal - amt
-              };
-            }
-            return w;
-          })
-        );
-      }
+      await fetchUserData();
     } catch (err) {
       console.error("Failed to submit transaction:", err);
     }
