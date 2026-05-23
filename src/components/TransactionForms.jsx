@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { ArrowDownLeft, ArrowUpRight, ArrowRightLeft, Calendar, FileText, DollarSign, Wallet, Tag, X, ChevronRight, Plus } from "lucide-react";
 import { getWalletTheme } from "../hooks/useWalletTheme";
+import { CURRENCY_LIST } from "../utils/currencyList";
 
 export default function TransactionForms({
   wallets = [],
@@ -28,6 +29,19 @@ export default function TransactionForms({
   const [transferAmount, setTransferAmount] = useState("");
   const [transferDescription, setTransferDescription] = useState("");
   const [transferDate, setTransferDate] = useState(new Date().toISOString().split("T")[0]);
+  const [transferCurrency, setTransferCurrency] = useState("IDR");
+
+  const handleAmountChange = (val) => {
+    const cleanNumber = val.replace(/[^0-9]/g, "");
+    const formatted = cleanNumber.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+    setAmount(formatted);
+  };
+
+  const handleTransferAmountChange = (val) => {
+    const cleanNumber = val.replace(/[^0-9]/g, "");
+    const formatted = cleanNumber.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+    setTransferAmount(formatted);
+  };
 
   // Set default wallet and category on mount if available
   React.useEffect(() => {
@@ -54,9 +68,11 @@ export default function TransactionForms({
     e.preventDefault();
     if (!name.trim() || !amount || !walletId || !categoryId) return;
 
+    const cleanAmountString = amount.replace(/\./g, "");
+
     onSubmitTransaction({
       name: name.trim(),
-      amount: Number(amount),
+      amount: cleanAmountString,
       type: txType,
       date,
       currency,
@@ -81,33 +97,41 @@ export default function TransactionForms({
       return;
     }
 
-    const sourceWalletName = wallets.find(w => (w._id === sourceWalletId || w.id === sourceWalletId))?.name || "Wallet A";
-    const destWalletName = wallets.find(w => (w._id === destWalletId || w.id === destWalletId))?.name || "Wallet B";
+    const cleanAmountString = transferAmount.replace(/\./g, "");
 
-    // 1. Post expense for source wallet
-    onSubmitTransaction({
-      name: `Transfer to ${destWalletName}`,
-      amount: Number(transferAmount),
-      type: "expense",
-      date: transferDate,
-      currency: "IDR",
-      description: transferDescription.trim() || `Transfer from ${sourceWalletName} to ${destWalletName}`,
-      category_id: "cat_2", // General / transfer category
-      wallet_id: sourceWalletId,
-      input_method: "manual"
+    const sourceWallet = wallets.find(w => (w._id === sourceWalletId || w.id === sourceWalletId));
+    const destWallet = wallets.find(w => (w._id === destWalletId || w.id === destWalletId));
+    const sourceWalletName = sourceWallet?.name || "Wallet A";
+    const destWalletName = destWallet?.name || "Wallet B";
+
+    // Find transfer category dynamically
+    let transferCategory = categories.find((c) => {
+      const cName = (c.name || "").toLowerCase();
+      return cName.includes("transfer") || cName.includes("pindahan") || cName.includes("kirim");
     });
 
-    // 2. Post income for destination wallet
+    if (!transferCategory) {
+      transferCategory = categories.find((c) => {
+        const cName = (c.name || "").toLowerCase();
+        return cName.includes("lain") || cName.includes("other");
+      });
+    }
+
+    const catId = transferCategory
+      ? (transferCategory._id || transferCategory.id)
+      : (categories[0]?._id || categories[0]?.id);
+
     onSubmitTransaction({
-      name: `Transfer from ${sourceWalletName}`,
-      amount: Number(transferAmount),
-      type: "income",
+      category_id: catId,
+      wallet_id: sourceWalletId,
+      target_wallet_id: destWalletId,
+      amount: cleanAmountString,
+      type: "transfer",
+      name: `Transfer ke ${destWalletName}`,
+      description: transferDescription.trim() || `Transfer dari ${sourceWalletName} ke ${destWalletName}`,
       date: transferDate,
-      currency: "IDR",
-      description: transferDescription.trim() || `Transfer from ${sourceWalletName} to ${destWalletName}`,
-      category_id: "cat_5", // General / transfer category
-      wallet_id: destWalletId,
-      input_method: "manual"
+      input_method: "manual",
+      currency: transferCurrency
     });
 
     // Reset Form
@@ -199,19 +223,36 @@ export default function TransactionForms({
               />
             </div>
 
-            {/* Amount & Date */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* Currency, Amount & Date */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="space-y-1.5">
-                <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest block pl-1">Amount (Rp)</label>
+                <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest block pl-1">Currency</label>
+                <select
+                  value={currency}
+                  onChange={(e) => setCurrency(e.target.value)}
+                  className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-4 py-3 text-xs focus:outline-none focus:border-[#00bf71] text-slate-700 font-semibold cursor-pointer transition-all"
+                >
+                  {CURRENCY_LIST.map((c) => (
+                    <option key={c.code} value={c.code}>
+                      {c.flag} {c.code}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest block pl-1">Amount</label>
                 <div className="relative flex items-center">
-                  <span className="absolute left-4 text-xs font-extrabold text-slate-400">Rp</span>
+                  <span className="absolute left-4 text-xs font-extrabold text-slate-400">
+                    {CURRENCY_LIST.find(c => c.code === currency)?.symbol || "Rp"}
+                  </span>
                   <input
-                    type="number"
+                    type="text"
                     required
                     placeholder="0"
                     value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
-                    className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl pl-10 pr-4 py-3 text-xs focus:outline-none focus:border-[#00bf71] text-slate-700 font-extrabold transition-all"
+                    onChange={(e) => handleAmountChange(e.target.value)}
+                    className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl pl-12 pr-4 py-3 text-xs focus:outline-none focus:border-[#00bf71] text-slate-700 font-extrabold transition-all"
                   />
                 </div>
               </div>
@@ -327,19 +368,36 @@ export default function TransactionForms({
               </div>
             </div>
 
-            {/* Transfer Amount & Date */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* Currency, Transfer Amount & Date */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="space-y-1.5">
-                <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest block pl-1">Transfer Amount (Rp)</label>
+                <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest block pl-1">Currency</label>
+                <select
+                  value={transferCurrency}
+                  onChange={(e) => setTransferCurrency(e.target.value)}
+                  className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-4 py-3 text-xs focus:outline-none focus:border-[#00bf71] text-slate-700 font-semibold cursor-pointer transition-all"
+                >
+                  {CURRENCY_LIST.map((c) => (
+                    <option key={c.code} value={c.code}>
+                      {c.flag} {c.code}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest block pl-1">Transfer Amount</label>
                 <div className="relative flex items-center">
-                  <span className="absolute left-4 text-xs font-extrabold text-slate-400">Rp</span>
+                  <span className="absolute left-4 text-xs font-extrabold text-slate-400">
+                    {CURRENCY_LIST.find(c => c.code === transferCurrency)?.symbol || "Rp"}
+                  </span>
                   <input
-                    type="number"
+                    type="text"
                     required
                     placeholder="0"
                     value={transferAmount}
-                    onChange={(e) => setTransferAmount(e.target.value)}
-                    className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl pl-10 pr-4 py-3 text-xs focus:outline-none focus:border-[#00bf71] text-slate-700 font-extrabold transition-all"
+                    onChange={(e) => handleTransferAmountChange(e.target.value)}
+                    className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl pl-12 pr-4 py-3 text-xs focus:outline-none focus:border-[#00bf71] text-slate-700 font-extrabold transition-all"
                   />
                 </div>
               </div>

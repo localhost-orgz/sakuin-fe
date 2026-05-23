@@ -215,6 +215,7 @@ function handleOfflineFallback(endpoint, method, body) {
         date: body.date || new Date().toISOString().split("T")[0],
         category_id: body.category_id,
         wallet_id: body.wallet_id,
+        target_wallet_id: body.target_wallet_id || null,
         input_method: body.input_method || "manual"
       };
       transactions.unshift(newTx);
@@ -222,13 +223,24 @@ function handleOfflineFallback(endpoint, method, body) {
 
       // Adjust wallet balance
       const updatedWallets = wallets.map(w => {
-        if (w._id === body.wallet_id || w.id === body.wallet_id) {
-          const bal = Number(w.balance);
-          const amt = Number(body.amount);
-          return {
-            ...w,
-            balance: body.type === "income" ? bal + amt : bal - amt
-          };
+        const walletId = w._id || w.id;
+        const bal = Number(w.balance);
+        const amt = Number(body.amount);
+
+        if (body.type === "transfer") {
+          if (walletId === body.wallet_id) {
+            return { ...w, balance: bal - amt };
+          }
+          if (walletId === body.target_wallet_id) {
+            return { ...w, balance: bal + amt };
+          }
+        } else {
+          if (walletId === body.wallet_id) {
+            return {
+              ...w,
+              balance: body.type === "income" ? bal + amt : bal - amt
+            };
+          }
         }
         return w;
       });
@@ -242,13 +254,24 @@ function handleOfflineFallback(endpoint, method, body) {
       if (tx) {
         // Reverse balance adjustment
         const updatedWallets = wallets.map(w => {
-          if (w._id === tx.wallet_id || w.id === tx.wallet_id) {
-            const bal = Number(w.balance);
-            const amt = Number(tx.amount);
-            return {
-              ...w,
-              balance: tx.type === "income" ? bal - amt : bal + amt
-            };
+          const walletId = w._id || w.id;
+          const bal = Number(w.balance);
+          const amt = Number(tx.amount);
+
+          if (tx.type === "transfer") {
+            if (walletId === tx.wallet_id) {
+              return { ...w, balance: bal + amt };
+            }
+            if (walletId === tx.target_wallet_id) {
+              return { ...w, balance: bal - amt };
+            }
+          } else {
+            if (walletId === tx.wallet_id) {
+              return {
+                ...w,
+                balance: tx.type === "income" ? bal - amt : bal + amt
+              };
+            }
           }
           return w;
         });
