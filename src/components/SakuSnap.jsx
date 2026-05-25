@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Camera, Upload, X, Check, RefreshCw, Sparkles, Loader2, DollarSign, Wallet, Users, UserPlus } from "lucide-react";
 import { getWalletTheme } from "../hooks/useWalletTheme";
+import { apiRequest } from "../utils/api";
 
 const MOCK_STRUK_DATA = {
   merchant: "McDonald's - Sudirman",
@@ -112,12 +113,59 @@ export default function SakuSnap({
     }
   };
 
-  const triggerScan = (imgUrl) => {
+  const dataURLtoFile = (dataurl, filename) => {
+    const arr = dataurl.split(",");
+    const mime = arr[0].match(/:(.*?);/)[1];
+    const bstr = atob(arr[1]);
+    let n = bstr.length;
+    const u8arr = new Uint8Array(n);
+    while (n--) {
+      u8arr[n] = bstr.charCodeAt(n);
+    }
+    return new File([u8arr], filename, { type: mime });
+  };
+
+  const triggerScan = async (imgUrl) => {
     setStep("scanning");
-    // Simulate OCR Scan for 2.5 seconds
-    setTimeout(() => {
-      setStep("result");
-    }, 2500);
+    try {
+      const file = dataURLtoFile(imgUrl, "receipt.jpg");
+      const formData = new FormData();
+      formData.append("receipt", file);
+
+      const res = await apiRequest("/ai/sakusnap", {
+        method: "POST",
+        body: formData,
+        isFormData: true,
+      });
+
+      if (res.status === "success" && res.data) {
+        const mappedData = {
+          merchant: res.data.description || "Struk Pembelian",
+          date: res.data.date || new Date().toISOString().split("T")[0],
+          items: res.data.items ? res.data.items.map((it, idx) => ({
+            id: idx + 1,
+            name: it.name,
+            price: Number(it.price) || 0
+          })) : [],
+          tax: 0,
+          total: res.data.amount || 0
+        };
+        
+        if (res.data.category_id) {
+          setSelectedCategoryId(res.data.category_id);
+        }
+        
+        setOcrData(mappedData);
+        setStep("result");
+      } else {
+        throw new Error(res.message || "Failed to scan receipt");
+      }
+    } catch (err) {
+      console.error("SakuSnap OCR failed:", err);
+      alert(err.message || "Gagal scan struk. Silakan coba lagi.");
+      setStep("capture");
+      setPhotoUrl(null);
+    }
   };
 
   const handleRecapture = () => {
