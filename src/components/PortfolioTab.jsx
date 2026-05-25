@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Wallet, Target, X, Check, Trash2, ArrowRightLeft, Sparkles, ChevronRight, Eye, EyeOff } from "lucide-react";
+import { Wallet, Target, X, Check, Trash2, ArrowRightLeft, Sparkles, ChevronRight, Eye, EyeOff, Edit2 } from "lucide-react";
 import { getWalletGradient, getWalletThemeIds, getWalletTheme } from "../hooks/useWalletTheme";
 
 export default function PortfolioTab({
@@ -10,6 +10,7 @@ export default function PortfolioTab({
   onDeleteWallet,
   onAddGoal,
   onDeleteGoal,
+  onUpdateGoal,
   isBalanceShow,
   setIsBalanceShow,
   onNavigateToWallet
@@ -17,8 +18,10 @@ export default function PortfolioTab({
   // Modal visibility states
   const [showAddWallet, setShowAddWallet] = useState(false);
   const [showAddGoal, setShowAddGoal] = useState(false);
+  const [showEditGoal, setShowEditGoal] = useState(false);
   const [selectedWallet, setSelectedWallet] = useState(null);
   const [selectedGoal, setSelectedGoal] = useState(null);
+  const [editingGoal, setEditingGoal] = useState(null);
 
   // Form states - Wallet
   const [walletName, setWalletName] = useState("");
@@ -32,6 +35,44 @@ export default function PortfolioTab({
   const [goalTarget, setGoalTarget] = useState("");
   const [goalThemeId, setGoalThemeId] = useState("ocean");
   const [goalCurrent, setGoalCurrent] = useState("");
+
+  // Form states - Edit Goal
+  const [editGoalName, setEditGoalName] = useState("");
+  const [editGoalEmoji, setEditGoalEmoji] = useState("🎯");
+  const [editGoalTarget, setEditGoalTarget] = useState("");
+  const [editGoalThemeId, setEditGoalThemeId] = useState("ocean");
+  const [editGoalCurrent, setEditGoalCurrent] = useState("");
+
+  const handleOpenEditGoal = (goal) => {
+    setEditingGoal(goal);
+    setEditGoalName(goal.name || "");
+    setEditGoalEmoji(goal.icon || "🎯");
+    setEditGoalTarget(goal.target ? goal.target.toString() : "");
+    setEditGoalCurrent(goal.current ? goal.current.toString() : "0");
+    setEditGoalThemeId(goal.themeId || "ocean");
+    setShowEditGoal(true);
+    setSelectedGoal(null); // Close details modal
+  };
+
+  const handleEditGoalSubmit = (e) => {
+    e.preventDefault();
+    if (!editGoalName.trim() || !editGoalTarget) return;
+    onUpdateGoal(editingGoal._id || editingGoal.id, {
+      name: editGoalName.trim(),
+      icon: editGoalEmoji,
+      target: Number(editGoalTarget),
+      current: Number(editGoalCurrent) || 0,
+      themeId: editGoalThemeId
+    });
+    // Reset Form
+    setEditingGoal(null);
+    setEditGoalName("");
+    setEditGoalEmoji("🎯");
+    setEditGoalTarget("");
+    setEditGoalCurrent("");
+    setEditGoalThemeId("ocean");
+    setShowEditGoal(false);
+  };
 
   const formatIDR = (value) => {
     return new Intl.NumberFormat("id-ID", {
@@ -628,8 +669,14 @@ export default function PortfolioTab({
 
               <div className="flex gap-2.5 pt-3 border-t border-slate-100 justify-end">
                 <button
+                  onClick={() => handleOpenEditGoal(selectedGoal)}
+                  className="px-4 py-2 border border-slate-200 hover:bg-blue-50 hover:text-blue-600 text-slate-500 font-bold rounded-full text-xs transition-colors flex items-center gap-1.5 cursor-pointer animate-fade-in"
+                >
+                  <Edit2 className="w-3.5 h-3.5" /> Edit Goal
+                </button>
+                <button
                   onClick={() => {
-                    onDeleteGoal(selectedGoal.id);
+                    onDeleteGoal(selectedGoal._id || selectedGoal.id);
                     setSelectedGoal(null);
                   }}
                   className="px-4 py-2 border border-slate-200 hover:bg-rose-50 hover:text-rose-600 text-slate-500 font-bold rounded-full text-xs transition-colors flex items-center gap-1.5 cursor-pointer"
@@ -644,6 +691,116 @@ export default function PortfolioTab({
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ────────────────── EDIT GOAL MODAL ────────────────── */}
+      {showEditGoal && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white rounded-3xl shadow-xl w-full max-w-md overflow-hidden animate-slide-up border border-slate-100/50">
+            <div className="px-6 py-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+              <h3 className="font-extrabold text-base text-slate-800 flex items-center gap-2">
+                <Target className="w-5 h-5 text-[#00bf71]" /> Edit Saving Goal
+              </h3>
+              <button
+                onClick={() => setShowEditGoal(false)}
+                className="p-1.5 hover:bg-slate-100 rounded-full text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleEditGoalSubmit} className="p-6 space-y-5 text-left">
+              <div className="grid grid-cols-4 gap-3">
+                <div className="col-span-3 space-y-1.5">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Goal Name</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. New Macbook, Bali Trip..."
+                    value={editGoalName}
+                    onChange={(e) => setEditGoalName(e.target.value)}
+                    className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#00bf71] focus:border-[#00bf71] text-slate-800 transition-all"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Icon</label>
+                  <select
+                    value={editGoalEmoji}
+                    onChange={(e) => setEditGoalEmoji(e.target.value)}
+                    className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#00bf71] focus:border-[#00bf71] text-center text-slate-800 font-bold cursor-pointer transition-all"
+                  >
+                    {emojiOptions.map((e) => (
+                      <option key={e} value={e}>
+                        {e}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3.5">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Saved Amount (Rp)</label>
+                  <input
+                    type="number"
+                    placeholder="0"
+                    value={editGoalCurrent}
+                    onChange={(e) => setEditGoalCurrent(e.target.value)}
+                    className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#00bf71] focus:border-[#00bf71] text-slate-800 font-bold transition-all"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Target Amount (Rp)</label>
+                  <input
+                    type="number"
+                    required
+                    placeholder="1000000"
+                    value={editGoalTarget}
+                    onChange={(e) => setEditGoalTarget(e.target.value)}
+                    className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#00bf71] focus:border-[#00bf71] text-slate-800 font-bold transition-all"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Color Theme</label>
+                <div className="grid grid-cols-6 gap-2.5">
+                  {getWalletThemeIds().map((tid) => {
+                    const themeObj = getWalletTheme(tid);
+                    const isSelected = editGoalThemeId === tid;
+                    return (
+                      <button
+                        type="button"
+                        key={tid}
+                        onClick={() => setEditGoalThemeId(tid)}
+                        style={{ backgroundColor: themeObj.accentColor }}
+                        className="h-9 rounded-xl flex items-center justify-center text-white relative shadow-sm cursor-pointer hover:opacity-90 active:scale-95 transition-all"
+                      >
+                        {isSelected && <Check className="w-4 h-4 stroke-[3px]" />}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3.5 pt-4 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setShowEditGoal(false)}
+                  className="px-4 py-2.5 border border-slate-200 hover:bg-slate-50 rounded-full text-xs font-bold text-slate-600 cursor-pointer transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="bg-[#00bf71] hover:bg-[#00a862] text-white text-xs font-bold px-5 py-2.5 rounded-full transition-all cursor-pointer shadow-sm hover:shadow"
+                >
+                  Save Changes
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

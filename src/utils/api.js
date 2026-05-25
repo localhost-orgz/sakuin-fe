@@ -70,9 +70,11 @@ export async function apiRequest(endpoint, {
   const url = `${BASE_URL}${endpoint}${queryString}`;
   const token = localStorage.getItem("user_token");
 
-  if (token === "mock_token_sakuin_web_2026" || endpoint.startsWith("/goals")) {
+  if (token === "mock_token_sakuin_web_2026") {
     return handleOfflineFallback(endpoint, method, body);
   }
+
+  const isGoals = endpoint.startsWith("/goals");
 
   const headers = isFormData
     ? { ...customHeaders }
@@ -88,6 +90,10 @@ export async function apiRequest(endpoint, {
   let res;
   try {
     res = await fetch(url, options);
+    if (isGoals && res.status === 404) {
+      console.warn(`Goals API returned 404. Falling back to offline local storage.`);
+      return handleOfflineFallback(endpoint, method, body);
+    }
   } catch (fetchErr) {
     console.warn(`API ${method} ${endpoint} network failed. Using offline localStorage fallback.`, fetchErr);
     return handleOfflineFallback(endpoint, method, body);

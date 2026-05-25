@@ -273,9 +273,23 @@ export default function App() {
       await apiRequest(`/goals/${goalId}`, {
         method: "DELETE"
       });
-      setGoals(prev => prev.filter(g => g.id !== goalId));
+      setGoals(prev => prev.filter(g => g.id !== goalId && g._id !== goalId));
     } catch (err) {
       console.error("Failed to delete goal:", err);
+    }
+  };
+
+  const handleUpdateGoal = async (goalId, goalData) => {
+    try {
+      const res = await apiRequest(`/goals/${goalId}`, {
+        method: "PUT",
+        body: goalData
+      });
+      if (res?.data) {
+        setGoals(prev => prev.map(g => (g._id === goalId || g.id === goalId) ? res.data : g));
+      }
+    } catch (err) {
+      console.error("Failed to update goal:", err);
     }
   };
 
@@ -449,6 +463,7 @@ export default function App() {
           onDeleteWallet={handleDeleteWallet}
           onAddGoal={handleAddGoal}
           onDeleteGoal={handleDeleteGoal}
+          onUpdateGoal={handleUpdateGoal}
           isBalanceShow={isBalanceShow}
           setIsBalanceShow={setIsBalanceShow}
           onNavigateToWallet={handleNavigateToWallet}
