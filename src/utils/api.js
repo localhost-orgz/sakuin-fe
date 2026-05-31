@@ -167,6 +167,40 @@ function handleOfflineFallback(endpoint, method, body) {
   const transactions = getLocalData("sakuin_transactions", DEFAULT_TRANSACTIONS);
   const goals = getLocalData("sakuin_goals", DEFAULT_GOALS);
 
+  // AI Endpoints Fallback
+  if (endpoint.startsWith("/ai/sakuvoice")) {
+    return {
+      status: "success",
+      data: {
+        name: "Makan Nasi Goreng",
+        description: "Beli nasi goreng enak 25 ribu di warung",
+        amount: 25000,
+        type: "expense",
+        category_id: categories[0]?._id || categories[0]?.id || "cat_1",
+        wallet_id: wallets[0]?._id || wallets[0]?.id || "w_1",
+        date: new Date().toISOString().split("T")[0],
+        currency: "IDR"
+      }
+    };
+  }
+
+  if (endpoint.startsWith("/ai/sakusnap")) {
+    return {
+      status: "success",
+      data: {
+        description: "Scan Struk Kopi",
+        date: new Date().toISOString().split("T")[0],
+        amount: 45000,
+        category_id: categories[0]?._id || categories[0]?.id || "cat_1",
+        wallet_id: wallets[0]?._id || wallets[0]?.id || "w_1",
+        items: [
+          { name: "Kopi Susu", quantity: 2, price: 20000, total: 40000 },
+          { name: "Donut", quantity: 1, price: 5000, total: 5000 }
+        ]
+      }
+    };
+  }
+
   // 1. Wallets Endpoint
   if (endpoint.startsWith("/wallets")) {
     const idParam = endpoint.replace("/wallets", "").replace("/", "");

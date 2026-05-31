@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Mic, MicOff, Volume2, Sparkles, AlertCircle, Edit3, Check, Trash2, X, Play, Square } from "lucide-react";
+import { Mic, MicOff, Volume2, Sparkles, AlertCircle, Edit3, Check, Trash2, X, Play, Loader2 } from "lucide-react";
 import { getWalletTheme } from "../hooks/useWalletTheme";
+import { apiRequest } from "../utils/api";
 
 export default function SakuVoice({
   wallets = [],
@@ -12,6 +13,7 @@ export default function SakuVoice({
   const [transcript, setTranscript] = useState("");
   const [isSupported, setIsSupported] = useState(true);
   const [errorMsg, setErrorMsg] = useState("");
+  const [isTranscribing, setIsTranscribing] = useState(false);
 
   // Parsed states
   const [parsedName, setParsedName] = useState("");
@@ -21,15 +23,22 @@ export default function SakuVoice({
   const [parsedCategoryId, setParsedCategoryId] = useState("");
   const [parsedDate, setParsedDate] = useState(new Date().toISOString().split("T")[0]);
 
-  // Speech Recognition Reference
+  // Audio Recording References
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
+  const audioStreamRef = useRef(null);
+
+  // Speech Recognition Reference (as fallback)
   const recognitionRef = useRef(null);
 
   useEffect(() => {
-    // Check browser compatibility
+    // Check browser compatibility for SpeechRecognition fallback
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
-      setIsSupported(false);
-      setErrorMsg("Browser Anda tidak mendukung fitur Voice-to-Text secara penuh. Kami menyediakan simulasi input teks suara di bawah!");
+      if (!window.MediaRecorder) {
+        setIsSupported(false);
+        setErrorMsg("Browser Anda tidak mendukung perekaman suara.");
+      }
     } else {
       const rec = new SpeechRecognition();
       rec.continuous = false;
@@ -51,7 +60,7 @@ export default function SakuVoice({
       rec.onerror = (event) => {
         console.error("Speech recognition error:", event.error);
         if (event.error === "not-allowed") {
-          setErrorMsg("Izin mikrofon ditolak. Silakan periksa pengaturan browser Anda.");
+          setErrorMsg("Izin mikrofon ditolak.");
         } else {
           setErrorMsg(`Terjadi kesalahan perekaman: ${event.error}`);
         }
@@ -72,13 +81,19 @@ export default function SakuVoice({
     if (categories.length > 0) {
       setParsedCategoryId(categories[0]._id || categories[0].id);
     }
+
+    return () => {
+      // Clean up audio tracks on unmount
+      if (audioStreamRef.current) {
+        audioStreamRef.current.getTracks().forEach(track => track.stop());
+      }
+    };
   }, [wallets, categories]);
 
-  // NLP / Speech Parser for Indonesian language
+  // Local Fallback Parser if API fails or SpeechRecognition is triggered
   const parseIndonesianSpeech = (text) => {
     const textLower = text.toLowerCase();
     
-    // 1. Determine Type
     let type = "expense";
     const incomeKeywords = ["masuk", "gaji", "terima", "dapat", "pemasukan", "transfer masuk", "income", "untung"];
     if (incomeKeywords.some(keyword => textLower.includes(keyword))) {
@@ -86,17 +101,9 @@ export default function SakuVoice({
     }
     setParsedType(type);
 
-    // 2. Extract Amount
     let amount = 0;
-    // Look for numbers like "25 ribu" or "25.000" or "5 juta" or pure digits
-    // E.g., "beli nasi goreng 25 ribu" -> 25000
-    // "gaji masuk 5 juta" -> 5000000
-    const cleanNumbersOnly = textLower.replace(/[^0-9\s]/g, "").trim();
-    
-    // Parse "ribu", "juta", "ratus"
     let matches = textLower.match(/(\d+)\s*(ribu|juta|ratus|puluh)?/gi);
     if (matches) {
-      // Pick the first match usually containing amount
       const rawText = matches[0];
       const numericVal = parseFloat(rawText.match(/\d+/)[0]);
       if (rawText.includes("ribu")) {
@@ -109,7 +116,6 @@ export default function SakuVoice({
         amount = numericVal;
       }
     } else {
-      // Fallback: search for first sequence of numbers
       const numMatch = textLower.match(/\b\d+\b/);
       if (numMatch) {
         amount = Number(numMatch[0]);
@@ -117,7 +123,6 @@ export default function SakuVoice({
     }
     setParsedAmount(amount > 0 ? amount.toString() : "");
 
-    // 3. Extract Wallet
     let matchedWallet = wallets[0];
     wallets.forEach(w => {
       const wName = w.name.toLowerCase();
@@ -129,17 +134,14 @@ export default function SakuVoice({
       setParsedWalletId(matchedWallet._id || matchedWallet.id);
     }
 
-    // 4. Extract Category
     let matchedCat = categories[0];
     categories.forEach(c => {
       const cName = c.name.toLowerCase();
-      // Split category name (e.g. "Makanan & Minuman" -> "makanan", "minuman")
       const parts = cName.replace(/[&|]/g, "").split(/\s+/);
       if (textLower.includes(cName) || parts.some(part => part.length > 3 && textLower.includes(part))) {
         matchedCat = c;
       }
     });
-    // Check specific popular keyword matches if no direct matches
     if (textLower.includes("makan") || textLower.includes("minum") || textLower.includes("kopi") || textLower.includes("sarapan")) {
       const found = categories.find(c => c.name.toLowerCase().includes("makan") || c.name.toLowerCase().includes("minum"));
       if (found) matchedCat = found;
@@ -155,26 +157,20 @@ export default function SakuVoice({
       setParsedCategoryId(matchedCat._id || matchedCat.id);
     }
 
-    // 5. Extract Title
-    // Clean out parsed elements (amount, wallet names, category names, helper verbs) to form clean title
     let title = text;
-    // Replace numbers and units
     title = title.replace(/\d+/g, "")
                  .replace(/ribu/gi, "")
                  .replace(/juta/gi, "")
                  .replace(/rupiah/gi, "")
                  .replace(/rp/gi, "");
     
-    // Replace wallet names
     wallets.forEach(w => {
       title = title.replace(new RegExp(w.name, "gi"), "");
     });
 
-    // Remove trigger verbs at start
     title = title.replace(/^(beli|bayar|gaji|dapat|masuk|buat|catat|transaksi|ada)\s+/i, "");
     title = title.trim();
 
-    // Capitalize first letter
     if (title.length > 0) {
       title = title.charAt(0).toUpperCase() + title.slice(1);
     } else {
@@ -183,27 +179,108 @@ export default function SakuVoice({
     setParsedName(title);
   };
 
-  const startVoiceCapture = () => {
-    if (recognitionRef.current) {
-      try {
-        recognitionRef.current.start();
-      } catch (err) {
-        console.error("Failed to start voice capture", err);
+  const uploadAndParseAudio = async (audioBlob) => {
+    setIsTranscribing(true);
+    setErrorMsg("");
+    try {
+      const file = new File([audioBlob], "recording.webm", { type: "audio/webm" });
+      const formData = new FormData();
+      formData.append("voice", file);
+
+      console.log("Mengirim file audio ke /ai/sakuvoice...");
+      const res = await apiRequest("/ai/sakuvoice", {
+        method: "POST",
+        body: formData,
+        isFormData: true,
+      });
+
+      if (res.status === "success" && res.data) {
+        const parsed = res.data;
+        setTranscript(parsed.description || "Suara berhasil diterjemahkan");
+        setParsedName(parsed.name || "Transaksi Suara");
+        setParsedAmount(parsed.amount ? String(parsed.amount) : "");
+        setParsedType(parsed.type || "expense");
+        
+        if (parsed.wallet_id) {
+          setParsedWalletId(parsed.wallet_id);
+        }
+        if (parsed.category_id) {
+          setParsedCategoryId(parsed.category_id);
+        }
+        if (parsed.date) {
+          setParsedDate(parsed.date);
+        }
+        setIsDone(true);
+      } else {
+        throw new Error(res.message || "Failed to parse audio");
+      }
+    } catch (err) {
+      console.warn("Gagal memproses audio via API. Menggunakan transkripsi fallback manual.", err);
+      setErrorMsg("Gagal memproses suara di server. Silakan coba lagi atau gunakan simulasi teks.");
+    } finally {
+      setIsTranscribing(false);
+    }
+  };
+
+  const startVoiceCapture = async () => {
+    setTranscript("");
+    setErrorMsg("");
+    setIsDone(false);
+    audioChunksRef.current = [];
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      audioStreamRef.current = stream;
+
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data && event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      mediaRecorder.onstop = async () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+        await uploadAndParseAudio(audioBlob);
+      };
+
+      mediaRecorder.start();
+      setIsRecording(true);
+    } catch (err) {
+      console.warn("MediaRecorder failed, falling back to Web Speech API", err);
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.start();
+          setIsRecording(true);
+        } catch (recErr) {
+          console.error("Speech recognition failed:", recErr);
+          setErrorMsg("Gagal mengakses mikrofon.");
+        }
+      } else {
+        setErrorMsg("Perekaman suara tidak didukung.");
       }
     }
   };
 
   const stopVoiceCapture = () => {
-    if (recognitionRef.current) {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      mediaRecorderRef.current.stop();
+      if (audioStreamRef.current) {
+        audioStreamRef.current.getTracks().forEach(track => track.stop());
+      }
+    } else if (recognitionRef.current) {
       recognitionRef.current.stop();
-      setIsRecording(false);
     }
+    setIsRecording(false);
   };
 
   // Keyboard Simulation Fallback for testing voice inputs
   const handleSimulationSubmit = (simText) => {
     setTranscript(simText);
     parseIndonesianSpeech(simText);
+    setIsDone(true);
   };
 
   const handleFinalSubmit = (e) => {
@@ -212,18 +289,20 @@ export default function SakuVoice({
 
     onSubmitTransaction({
       name: parsedName.trim(),
-      amount: Number(parsedAmount),
+      amount: String(parsedAmount),
       type: parsedType,
       date: parsedDate,
       currency: "IDR",
       category_id: parsedCategoryId,
       wallet_id: parsedWalletId,
       description: transcript ? `Transcribed: "${transcript}"` : "Input via Voice Track",
-      input_method: "voice"
+      input_method: "sakuvoice"
     });
 
     onClose();
   };
+
+  const [isDone, setIsDone] = useState(false);
 
   return (
     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -251,7 +330,11 @@ export default function SakuVoice({
           {/* Waveform & Rec trigger area */}
           <div className="bg-slate-900 rounded-2xl p-6 text-white flex flex-col items-center justify-center gap-4 relative overflow-hidden">
             {/* Wave animation */}
-            {isRecording ? (
+            {isTranscribing ? (
+              <div className="flex items-center justify-center h-16 w-full">
+                <Loader2 className="w-8 h-8 text-emerald-500 animate-spin" />
+              </div>
+            ) : isRecording ? (
               <div className="flex items-end justify-center gap-1.5 h-16 w-full">
                 <div className="w-1.5 bg-emerald-500 rounded-full animate-[bounce_0.6s_infinite_100ms] h-8" />
                 <div className="w-1.5 bg-emerald-400 rounded-full animate-[bounce_0.6s_infinite_200ms] h-12" />
@@ -272,16 +355,17 @@ export default function SakuVoice({
 
             <button
               type="button"
+              disabled={isTranscribing}
               onClick={isRecording ? stopVoiceCapture : startVoiceCapture}
               className={`w-16 h-16 rounded-full flex items-center justify-center transition-all shadow-lg active:scale-95 cursor-pointer z-10 ${
-                isRecording ? "bg-rose-500 hover:bg-rose-600 shadow-rose-500/20" : "bg-emerald-500 hover:bg-emerald-600 shadow-emerald-500/20"
+                isTranscribing ? "bg-slate-700 cursor-not-allowed" : isRecording ? "bg-rose-500 hover:bg-rose-600 shadow-rose-500/20" : "bg-emerald-500 hover:bg-emerald-600 shadow-emerald-500/20"
               }`}
             >
-              {isRecording ? <MicOff className="w-6 h-6 text-white" /> : <Mic className="w-6 h-6 text-white" />}
+              {isTranscribing ? <Loader2 className="w-6 h-6 text-white animate-spin" /> : isRecording ? <MicOff className="w-6 h-6 text-white" /> : <Mic className="w-6 h-6 text-white" />}
             </button>
 
             <span className="text-xs font-bold tracking-wide uppercase text-slate-400">
-              {isRecording ? "Sedang mendengarkan... Berbicaralah sekarang" : "Klik tombol mic untuk mulai bicara"}
+              {isTranscribing ? "SakuVoice sedang memproses rekaman..." : isRecording ? "Sedang mendengarkan... Berbicaralah sekarang" : "Klik tombol mic untuk mulai bicara"}
             </span>
 
             {/* Error notifications */}

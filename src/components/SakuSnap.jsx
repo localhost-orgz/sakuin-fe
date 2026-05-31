@@ -7,10 +7,10 @@ const MOCK_STRUK_DATA = {
   merchant: "McDonald's - Sudirman",
   date: new Date().toISOString().split("T")[0],
   items: [
-    { id: 1, name: "Double Cheeseburger", price: 45000 },
-    { id: 2, name: "French Fries Large", price: 22000 },
-    { id: 3, name: "Coca Cola Medium", price: 15000 },
-    { id: 4, name: "Apple Pie", price: 12000 }
+    { id: 1, name: "Double Cheeseburger", quantity: 1, price: 45000, total: 45000 },
+    { id: 2, name: "French Fries Large", quantity: 1, price: 22000, total: 22000 },
+    { id: 3, name: "Coca Cola Medium", quantity: 1, price: 15000, total: 15000 },
+    { id: 4, name: "Apple Pie", quantity: 1, price: 12000, total: 12000 }
   ],
   tax: 9400,
   total: 103400
@@ -30,6 +30,7 @@ export default function SakuSnap({
   const [selectedWalletId, setSelectedWalletId] = useState("");
   const [selectedCategoryId, setSelectedCategoryId] = useState("");
   const [savedTransaction, setSavedTransaction] = useState(null);
+  const [isSavedConfirmed, setIsSavedConfirmed] = useState(false);
 
   // Split bill states
   const [friends, setFriends] = useState(["Saya", "Budi", "Siti"]);
@@ -141,17 +142,38 @@ export default function SakuSnap({
       });
 
       if (res.status === "success" && res.data) {
+        const parsedItems = res.data.items ? res.data.items.map((it, idx) => {
+          const qty = Number(it.quantity) || 1;
+          const price = Number(it.price) || 0;
+          const total = Number(it.total) || (price * qty);
+          return {
+            id: idx + 1,
+            name: it.name,
+            quantity: qty,
+            price: price,
+            total: total
+          };
+        }) : [];
+
+        const totalAmount = Number(res.data.amount) || 0;
+        const subtotal = parsedItems.reduce((sum, item) => sum + item.total, 0);
+        const calculatedTax = Math.max(0, totalAmount - subtotal);
+
         const mappedData = {
           merchant: res.data.description || "Struk Pembelian",
           date: res.data.date || new Date().toISOString().split("T")[0],
-          items: res.data.items ? res.data.items.map((it, idx) => ({
-            id: idx + 1,
-            name: it.name,
-            price: Number(it.price) || 0
-          })) : [],
-          tax: 0,
-          total: res.data.amount || 0
+          items: parsedItems,
+          tax: calculatedTax,
+          total: totalAmount,
+          attachment_url: res.data.attachment_url || res.data.imageUrl || res.data.image_url || res.data.url || null
         };
+
+        // Initialize assignments for the new item IDs
+        const newAssignments = {};
+        parsedItems.forEach(item => {
+          newAssignments[item.id] = ["Saya"];
+        });
+        setItemAssignments(newAssignments);
         
         let initialCategoryId = res.data.category_id;
         if (initialCategoryId) {
@@ -182,11 +204,15 @@ export default function SakuSnap({
               name: res.data.description ? res.data.description.substring(0, 30) : "Scan SakuSnap",
               description: res.data.description || "Pembelian dari SakuSnap",
               date: res.data.date || new Date().toISOString().split("T")[0],
-              input_method: "snap"
+              input_method: "sakusnap",
+              ...(res.data.attachment_url || res.data.imageUrl || res.data.image_url || res.data.url ? {
+                attachment_url: res.data.attachment_url || res.data.imageUrl || res.data.image_url || res.data.url
+              } : {})
             }
           });
-          if (postRes?.status === "success" && postRes.data) {
-            setSavedTransaction(postRes.data);
+          const transactionData = postRes?.data || postRes;
+          if (transactionData && (transactionData.id || transactionData._id)) {
+            setSavedTransaction(transactionData);
             if (onRefreshData) {
               await onRefreshData();
             }
@@ -249,13 +275,14 @@ export default function SakuSnap({
     let totalSubtotal = 0;
     ocrData.items.forEach(item => {
       const assigned = itemAssignments[item.id] || [];
-      const costPerPerson = item.price / assigned.length;
+      const lineTotal = item.total || (item.price * (item.quantity || 1));
+      const costPerPerson = lineTotal / (assigned.length || 1);
       assigned.forEach(f => {
         if (results[f] !== undefined) {
           results[f] += costPerPerson;
         }
       });
-      totalSubtotal += item.price;
+      totalSubtotal += lineTotal;
     });
 
     // Distribute tax proportionally
@@ -269,6 +296,24 @@ export default function SakuSnap({
     return results;
   };
 
+  const handleClose = async () => {
+    stopCamera();
+    if (savedTransaction && !isSavedConfirmed) {
+      try {
+        const txId = savedTransaction._id || savedTransaction.id;
+        await apiRequest(`/transaction/${txId}`, {
+          method: "DELETE"
+        });
+        if (onRefreshData) {
+          await onRefreshData();
+        }
+      } catch (err) {
+        console.warn("Failed to delete cancelled auto-posted transaction:", err);
+      }
+    }
+    onClose();
+  };
+
   const handleSaveTransaction = async () => {
     if (!selectedWalletId || !selectedCategoryId) return;
 
@@ -278,11 +323,11 @@ export default function SakuSnap({
       amount: String(ocrData.total),
       type: "expense",
       date: ocrData.date,
-      currency: "IDR",
       category_id: selectedCategoryId,
       wallet_id: selectedWalletId,
       description: `SakuSnap Scan dari ${ocrData.merchant}. Items: ${ocrData.items.map(i => `${i.name} (${i.price})`).join(", ")}`,
-      input_method: "snap"
+      input_method: "sakusnap",
+      ...(ocrData.attachment_url ? { attachment_url: ocrData.attachment_url } : {})
     };
 
     try {
@@ -291,6 +336,7 @@ export default function SakuSnap({
           method: "PUT",
           body
         });
+        setIsSavedConfirmed(true);
         if (onRefreshData) {
           await onRefreshData();
         }
@@ -326,10 +372,7 @@ export default function SakuSnap({
             <p className="text-xs text-slate-400">Pindai struk belanja fisik Anda untuk pencatatan instan</p>
           </div>
           <button
-            onClick={() => {
-              stopCamera();
-              onClose();
-            }}
+            onClick={handleClose}
             className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 transition-colors cursor-pointer"
           >
             <X className="w-4 h-4" />
@@ -447,13 +490,20 @@ export default function SakuSnap({
                 {/* Items list */}
                 <div className="space-y-2">
                   {ocrData.items.map((item) => (
-                    <div key={item.id} className="flex justify-between text-xs py-1">
-                      <span className="text-slate-600 font-medium">{item.name}</span>
-                      <span className="text-slate-800 font-bold">{formatIDR(item.price)}</span>
+                    <div key={item.id} className="flex justify-between items-center text-xs py-1">
+                      <div>
+                        <span className="text-slate-700 font-bold block">{item.name}</span>
+                        {item.quantity > 1 && (
+                          <span className="text-[10px] text-slate-400 block mt-0.5">
+                            {item.quantity}x @ {formatIDR(item.price)}
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-slate-800 font-bold">{formatIDR(item.total || (item.price * item.quantity))}</span>
                     </div>
                   ))}
                   <div className="flex justify-between text-xs text-slate-500 pt-2 border-t border-slate-200/40">
-                    <span>Pajak (10%)</span>
+                    <span>Pajak & Biaya Lainnya</span>
                     <span>{formatIDR(ocrData.tax)}</span>
                   </div>
                   <div className="flex justify-between text-sm font-extrabold text-slate-800 pt-2 border-t border-slate-200">
@@ -548,9 +598,16 @@ export default function SakuSnap({
                   <div className="space-y-3">
                     {ocrData.items.map(item => (
                       <div key={item.id} className="space-y-1.5 bg-white p-3 rounded-xl border border-slate-100">
-                        <div className="flex justify-between items-center text-xs">
-                          <span className="font-bold text-slate-800">{item.name}</span>
-                          <span className="font-bold text-slate-500">{formatIDR(item.price)}</span>
+                        <div className="flex justify-between items-start text-xs">
+                          <div>
+                            <span className="font-bold text-slate-800 block">{item.name}</span>
+                            {item.quantity > 1 && (
+                              <span className="text-[10px] text-slate-400 mt-0.5 block">
+                                {item.quantity}x @ {formatIDR(item.price)}
+                              </span>
+                            )}
+                          </div>
+                          <span className="font-bold text-slate-600">{formatIDR(item.total || (item.price * item.quantity))}</span>
                         </div>
                         <div className="flex flex-wrap gap-1">
                           {friends.map(friend => {
@@ -594,10 +651,7 @@ export default function SakuSnap({
         {step === "result" && (
           <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex gap-4 flex-shrink-0">
             <button
-              onClick={() => {
-                stopCamera();
-                onClose();
-              }}
+              onClick={handleClose}
               className="flex-1 border border-slate-200 hover:bg-slate-100 text-slate-500 font-bold py-3 px-4 rounded-xl text-xs transition-colors cursor-pointer text-center"
             >
               Batal
