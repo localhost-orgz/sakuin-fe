@@ -20,6 +20,7 @@ export default function SakuSnap({
   wallets = [],
   categories = [],
   onSubmitTransaction,
+  onRefreshData,
   onClose
 }) {
   const [step, setStep] = useState("capture"); // "capture" | "scanning" | "result"
@@ -28,6 +29,7 @@ export default function SakuSnap({
   const [ocrData, setOcrData] = useState(MOCK_STRUK_DATA);
   const [selectedWalletId, setSelectedWalletId] = useState("");
   const [selectedCategoryId, setSelectedCategoryId] = useState("");
+  const [savedTransaction, setSavedTransaction] = useState(null);
 
   // Split bill states
   const [friends, setFriends] = useState(["Saya", "Budi", "Siti"]);
@@ -151,8 +153,46 @@ export default function SakuSnap({
           total: res.data.amount || 0
         };
         
-        if (res.data.category_id) {
-          setSelectedCategoryId(res.data.category_id);
+        let initialCategoryId = res.data.category_id;
+        if (initialCategoryId) {
+          setSelectedCategoryId(initialCategoryId);
+        } else if (categories.length > 0) {
+          const foodCat = categories.find(c => c.name.toLowerCase().includes("makan") || c.name.toLowerCase().includes("minum"));
+          initialCategoryId = foodCat ? (foodCat._id || foodCat.id) : (categories[0]._id || categories[0].id);
+          setSelectedCategoryId(initialCategoryId);
+        } else {
+          initialCategoryId = "69a99efab5420796db171e00";
+        }
+
+        let initialWalletId = "";
+        if (wallets.length > 0) {
+          initialWalletId = wallets[0]._id || wallets[0].id;
+          setSelectedWalletId(initialWalletId);
+        }
+
+        // Post transaction automatically to /transaction
+        try {
+          const postRes = await apiRequest("/transaction", {
+            method: "POST",
+            body: {
+              category_id: initialCategoryId,
+              wallet_id: initialWalletId,
+              amount: String(res.data.amount || 0),
+              type: "expense",
+              name: res.data.description ? res.data.description.substring(0, 30) : "Scan SakuSnap",
+              description: res.data.description || "Pembelian dari SakuSnap",
+              date: res.data.date || new Date().toISOString().split("T")[0],
+              input_method: "snap"
+            }
+          });
+          if (postRes?.status === "success" && postRes.data) {
+            setSavedTransaction(postRes.data);
+            if (onRefreshData) {
+              await onRefreshData();
+            }
+          }
+        } catch (tErr) {
+          console.warn("Failed to post transaction automatically after OCR", tErr);
         }
         
         setOcrData(mappedData);
@@ -229,12 +269,13 @@ export default function SakuSnap({
     return results;
   };
 
-  const handleSaveTransaction = () => {
+  const handleSaveTransaction = async () => {
     if (!selectedWalletId || !selectedCategoryId) return;
 
-    onSubmitTransaction({
+    const txId = savedTransaction ? (savedTransaction._id || savedTransaction.id) : null;
+    const body = {
       name: ocrData.merchant,
-      amount: ocrData.total,
+      amount: String(ocrData.total),
       type: "expense",
       date: ocrData.date,
       currency: "IDR",
@@ -242,7 +283,23 @@ export default function SakuSnap({
       wallet_id: selectedWalletId,
       description: `SakuSnap Scan dari ${ocrData.merchant}. Items: ${ocrData.items.map(i => `${i.name} (${i.price})`).join(", ")}`,
       input_method: "snap"
-    });
+    };
+
+    try {
+      if (txId) {
+        await apiRequest(`/transaction/${txId}`, {
+          method: "PUT",
+          body
+        });
+        if (onRefreshData) {
+          await onRefreshData();
+        }
+      } else {
+        onSubmitTransaction(body);
+      }
+    } catch (err) {
+      console.error("Failed to save transaction updates:", err);
+    }
 
     onClose();
   };

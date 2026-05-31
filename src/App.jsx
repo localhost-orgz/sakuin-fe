@@ -520,6 +520,7 @@ export default function App() {
           wallets={wallets}
           categories={categories}
           onSubmitTransaction={handleSubmitTransaction}
+          onRefreshData={fetchUserData}
           onClose={() => setShowSnap(false)}
         />
       )}

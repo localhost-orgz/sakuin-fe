@@ -57,6 +57,20 @@ export function registerAuthFailureHandler(handler) {
   globalAuthFailureHandler = handler;
 }
 
+function mapGoalToFrontend(goal) {
+  if (!goal) return goal;
+  return {
+    ...goal,
+    id: goal.id || goal._id,
+    _id: goal._id || goal.id,
+    name: goal.name,
+    icon: goal.emoticon || goal.icon || "🎯",
+    target: goal.target_amount !== undefined && goal.target_amount !== null ? Number(goal.target_amount) : (Number(goal.target) || 0),
+    current: goal.current_amount !== undefined && goal.current_amount !== null ? Number(goal.current_amount) : (Number(goal.current) || 0),
+    themeId: goal.color || goal.themeId || "ocean"
+  };
+}
+
 export async function apiRequest(endpoint, {
   method = "GET",
   query = {},
@@ -85,7 +99,21 @@ export async function apiRequest(endpoint, {
   }
 
   const options = { method, headers };
-  if (body) options.body = isFormData ? body : JSON.stringify(body);
+
+  let finalBody = body;
+  if (isGoals && body && !isFormData) {
+    finalBody = {
+      name: body.name,
+      emoticon: body.icon || body.emoticon || "🎯",
+      target_amount: Number(body.target) || Number(body.target_amount) || 0,
+      color: body.themeId || body.color || "ocean"
+    };
+    if (body.current !== undefined) {
+      finalBody.current_amount = Number(body.current);
+    }
+  }
+
+  if (finalBody) options.body = isFormData ? finalBody : JSON.stringify(finalBody);
 
   let res;
   try {
@@ -113,6 +141,20 @@ export async function apiRequest(endpoint, {
       if (globalAuthFailureHandler) globalAuthFailureHandler();
     }
     throw new Error(data.message || "Request failed");
+  }
+
+  if (isGoals && data) {
+    if (Array.isArray(data)) {
+      data = data.map(mapGoalToFrontend);
+    } else if (data.data) {
+      if (Array.isArray(data.data)) {
+        data.data = data.data.map(mapGoalToFrontend);
+      } else {
+        data.data = mapGoalToFrontend(data.data);
+      }
+    } else {
+      data = mapGoalToFrontend(data);
+    }
   }
 
   return data;
