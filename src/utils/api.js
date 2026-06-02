@@ -59,6 +59,30 @@ export function registerAuthFailureHandler(handler) {
 
 function mapGoalToFrontend(goal) {
   if (!goal) return goal;
+  
+  let currentVal = goal.current_amount !== undefined && goal.current_amount !== null 
+    ? Number(goal.current_amount) 
+    : (Number(goal.current) || 0);
+
+  let transactionsList = goal.transactions || [];
+
+  if (Array.isArray(goal.history)) {
+    currentVal = goal.history.reduce((sum, item) => {
+      const amt = Number(item.amount) || 0;
+      return item.type === "withdraw" ? sum - amt : sum + amt;
+    }, 0);
+
+    transactionsList = goal.history.map(item => ({
+      _id: item._id,
+      id: item._id,
+      name: item.type === "withdraw" ? "Penarikan Dana" : "Tabungan Masuk",
+      amount: item.amount,
+      type: item.type === "withdraw" ? "expense" : "income",
+      date: item.date,
+      category_id: "cat_5"
+    }));
+  }
+
   return {
     ...goal,
     id: goal.id || goal._id,
@@ -66,7 +90,8 @@ function mapGoalToFrontend(goal) {
     name: goal.name,
     icon: goal.emoticon || goal.icon || "🎯",
     target: goal.target_amount !== undefined && goal.target_amount !== null ? Number(goal.target_amount) : (Number(goal.target) || 0),
-    current: goal.current_amount !== undefined && goal.current_amount !== null ? Number(goal.current_amount) : (Number(goal.current) || 0),
+    current: currentVal,
+    transactions: transactionsList,
     themeId: goal.color || goal.themeId || "ocean"
   };
 }
@@ -85,7 +110,7 @@ export async function apiRequest(endpoint, {
   const token = localStorage.getItem("user_token");
 
   if (token === "mock_token_sakuin_web_2026") {
-    return handleOfflineFallback(endpoint, method, body);
+    return handleOfflineFallback(endpoint, method, body, query);
   }
 
   const isGoals = endpoint.startsWith("/goals");
@@ -111,6 +136,13 @@ export async function apiRequest(endpoint, {
     if (body.current !== undefined) {
       finalBody.current_amount = Number(body.current);
     }
+  } else if (endpoint.startsWith("/goal-history") && method === "POST" && body && !isFormData) {
+    finalBody = {
+      goal_id: body.goal_id,
+      amount: String(body.amount),
+      type: body.type || "saving",
+      date: body.date
+    };
   }
 
   if (finalBody) options.body = isFormData ? finalBody : JSON.stringify(finalBody);
@@ -120,11 +152,15 @@ export async function apiRequest(endpoint, {
     res = await fetch(url, options);
     if (isGoals && res.status === 404) {
       console.warn(`Goals API returned 404. Falling back to offline local storage.`);
-      return handleOfflineFallback(endpoint, method, body);
+      return handleOfflineFallback(endpoint, method, body, query);
+    }
+    if (endpoint.startsWith("/goal-history") && method === "GET" && res.status === 404) {
+      console.warn(`Goal history GET returned 404. Treating as empty transactions.`);
+      return { status: "success", data: [] };
     }
   } catch (fetchErr) {
     console.warn(`API ${method} ${endpoint} network failed. Using offline localStorage fallback.`, fetchErr);
-    return handleOfflineFallback(endpoint, method, body);
+    return handleOfflineFallback(endpoint, method, body, query);
   }
 
   let data;
@@ -161,7 +197,7 @@ export async function apiRequest(endpoint, {
 }
 
 // Local Storage Offline Fallback Handler
-function handleOfflineFallback(endpoint, method, body) {
+function handleOfflineFallback(endpoint, method, body, query = {}) {
   const categories = getLocalData("sakuin_categories", DEFAULT_CATEGORIES);
   const wallets = getLocalData("sakuin_wallets", DEFAULT_WALLETS);
   const transactions = getLocalData("sakuin_transactions", DEFAULT_TRANSACTIONS);
@@ -389,11 +425,109 @@ function handleOfflineFallback(endpoint, method, body) {
     };
   }
 
+  // 4.5 Goal History handler for offline fallback
+  if (endpoint.startsWith("/goal-history")) {
+    const idParam = endpoint.replace("/goal-history", "").replace("/", "");
+    if (method === "GET") {
+      const targetId = idParam || query.goal_id;
+      if (targetId) {
+        const goal = goals.find(g => g.id === targetId || g._id === targetId);
+        if (goal) {
+          const dbTx = transactions.filter(t => t.goal_id === targetId || t.goal_id === goal._id);
+          if (dbTx.length === 0) {
+            const mockTx = [
+              { _id: "gtx_1", id: "gtx_1", name: "Setoran Awal", amount: 1000000, type: "income", date: "2026-05-01", category_id: categories[4]?.id || "cat_5", wallet_id: wallets[0]?.id || "w_1", goal_id: goal._id || goal.id },
+              { _id: "gtx_2", id: "gtx_2", name: "Tabungan Bulanan", amount: goal.current > 1000000 ? goal.current - 1000000 : 500000, type: "income", date: "2026-05-15", category_id: categories[4]?.id || "cat_5", wallet_id: wallets[1]?.id || "w_2", goal_id: goal._id || goal.id }
+            ];
+            return { status: "success", data: mockTx };
+          }
+          return { status: "success", data: dbTx };
+        }
+        return { status: "success", data: [] };
+      } else {
+        const dbTx = transactions.filter(t => t.goal_id);
+        return { status: "success", data: dbTx };
+      }
+    }
+
+    if (method === "POST" && body) {
+      const goalId = body.goal_id;
+      const walletId = body.wallet_id || (wallets.length > 0 ? (wallets[0]._id || wallets[0].id) : "w_1");
+      const amt = Number(body.amount) || 0;
+      const date = body.date || new Date().toISOString().split("T")[0];
+      const isWithdraw = body.type === "withdraw";
+      const desc = body.description || (isWithdraw ? "Penarikan dari Target" : "Setoran Target");
+
+      const updatedGoals = goals.map(g => {
+        if (g._id === goalId || g.id === goalId) {
+          const currentVal = Number(g.current) || 0;
+          return {
+            ...g,
+            current: isWithdraw ? Math.max(0, currentVal - amt) : currentVal + amt
+          };
+        }
+        return g;
+      });
+      setLocalData("sakuin_goals", updatedGoals);
+
+      const updatedWallets = wallets.map(w => {
+        if (w._id === walletId || w.id === walletId) {
+          const balanceVal = Number(w.balance) || 0;
+          return {
+            ...w,
+            balance: isWithdraw ? balanceVal + amt : balanceVal - amt
+          };
+        }
+        return w;
+      });
+      setLocalData("sakuin_wallets", updatedWallets);
+
+      const targetGoal = goals.find(g => g._id === goalId || g.id === goalId);
+      const goalName = targetGoal ? targetGoal.name : "Target";
+      const newTx = {
+        _id: uuid(),
+        id: uuid(),
+        name: isWithdraw ? `Penarikan dari ${goalName}` : `Setoran ke ${goalName}`,
+        amount: amt,
+        type: isWithdraw ? "income" : "expense",
+        description: desc,
+        date: date,
+        category_id: categories[4]?.id || "cat_5",
+        wallet_id: walletId,
+        goal_id: goalId,
+        input_method: "manual"
+      };
+
+      transactions.unshift(newTx);
+      setLocalData("sakuin_transactions", transactions);
+
+      return { status: "success", data: newTx };
+    }
+  }
+
   // 5. Custom Goals handler (not supported in BE but persisted locally for sakuin-web)
   if (endpoint.startsWith("/goals")) {
     const idParam = endpoint.replace("/goals", "").replace("/", "");
 
     if (method === "GET") {
+      if (idParam) {
+        const goal = goals.find(g => g.id === idParam || g._id === idParam);
+        if (goal) {
+          const dbTx = transactions.filter(t => t.goal_id === idParam || t.goal_id === goal._id);
+          const goalTx = dbTx.length > 0 ? dbTx : [
+            { _id: "gtx_1", id: "gtx_1", name: "Setoran Awal", amount: 1000000, type: "income", date: "2026-05-01", category_id: categories[4]?.id || "cat_5", wallet_id: wallets[0]?.id || "w_1" },
+            { _id: "gtx_2", id: "gtx_2", name: "Tabungan Bulanan", amount: goal.current > 1000000 ? goal.current - 1000000 : 500000, type: "income", date: "2026-05-15", category_id: categories[4]?.id || "cat_5", wallet_id: wallets[1]?.id || "w_2" }
+          ];
+          return {
+            status: "success",
+            data: {
+              ...goal,
+              transactions: goalTx
+            }
+          };
+        }
+        return { status: "error", message: "Goal not found" };
+      }
       return { status: "success", data: goals };
     }
 

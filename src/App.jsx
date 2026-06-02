@@ -9,6 +9,7 @@ import PortfolioTab from "./components/PortfolioTab";
 import ProfileTab from "./components/ProfileTab";
 import AllTransactionsTab from "./components/AllTransactionsTab";
 import WalletDetail from "./components/WalletDetail";
+import GoalDetail from "./components/GoalDetail";
 import SakuVoice from "./components/SakuVoice";
 import SakuSnap from "./components/SakuSnap";
 import TransactionForms from "./components/TransactionForms";
@@ -16,6 +17,7 @@ import TransactionForms from "./components/TransactionForms";
 const getTabFromPath = (path) => {
   const cleanPath = path.toLowerCase().replace(/^\/+/, "");
   if (cleanPath.startsWith("wallet/")) return "wallet-detail";
+  if (cleanPath.startsWith("goal/")) return "goal-detail";
   if (cleanPath === "analytics") return "analytics";
   if (cleanPath === "portfolio") return "portfolio";
   if (cleanPath === "profile") return "profile";
@@ -31,11 +33,20 @@ const getWalletIdFromPath = (path) => {
   return null;
 };
 
+const getGoalIdFromPath = (path) => {
+  const cleanPath = path.replace(/^\/+/, "");
+  if (cleanPath.startsWith("goal/")) {
+    return cleanPath.split("/")[1];
+  }
+  return null;
+};
+
 export default function App() {
   // Auth navigation states: 'onboarding' | 'signin' | 'authenticated' | 'loading'
   const [authState, setAuthState] = useState("loading");
   const [activeTab, setActiveTab] = useState(() => getTabFromPath(window.location.pathname));
   const [activeWalletId, setActiveWalletId] = useState(() => getWalletIdFromPath(window.location.pathname));
+  const [activeGoalId, setActiveGoalId] = useState(() => getGoalIdFromPath(window.location.pathname));
   const [isBalanceShow, setIsBalanceShow] = useState(true);
 
   // Core Data States
@@ -65,6 +76,7 @@ export default function App() {
       const path = window.location.pathname;
       setActiveTab(getTabFromPath(path));
       setActiveWalletId(getWalletIdFromPath(path));
+      setActiveGoalId(getGoalIdFromPath(path));
     };
 
     window.addEventListener("popstate", handlePopState);
@@ -76,6 +88,7 @@ export default function App() {
   const handleTabChange = (tabId) => {
     setActiveTab(tabId);
     setActiveWalletId(null);
+    setActiveGoalId(null);
     if (window.location.pathname !== "/" + tabId) {
       window.history.pushState(null, "", "/" + tabId);
     }
@@ -86,6 +99,14 @@ export default function App() {
     setActiveWalletId(walletId);
     if (window.location.pathname !== "/wallet/" + walletId) {
       window.history.pushState(null, "", "/wallet/" + walletId);
+    }
+  };
+
+  const handleNavigateToGoal = (goalId) => {
+    setActiveTab("goal-detail");
+    setActiveGoalId(goalId);
+    if (window.location.pathname !== "/goal/" + goalId) {
+      window.history.pushState(null, "", "/goal/" + goalId);
     }
   };
 
@@ -164,12 +185,16 @@ export default function App() {
   const fetchUserData = async () => {
     setLoading(true);
     try {
-      const [userRes, walletsRes, txRes, catRes, goalsRes] = await Promise.all([
+      const [userRes, walletsRes, txRes, catRes, goalsRes, goalHistoryRes] = await Promise.all([
         apiRequest("/auth/profile"),
         apiRequest("/wallets"),
         apiRequest("/transaction"),
         apiRequest("/categories"),
-        apiRequest("/goals")
+        apiRequest("/goals"),
+        apiRequest("/goal-history").catch(err => {
+          console.warn("Failed to fetch goal history:", err);
+          return { data: [] };
+        })
       ]);
 
       if (userRes?.data) setUser(userRes.data);
@@ -180,7 +205,55 @@ export default function App() {
         setTransactions(sorted);
       }
       if (catRes?.data) setCategories(catRes.data);
-      if (goalsRes?.data) setGoals(goalsRes.data);
+
+      if (goalsRes?.data) {
+        let histories = [];
+        if (goalHistoryRes) {
+          if (Array.isArray(goalHistoryRes)) {
+            histories = goalHistoryRes;
+          } else if (Array.isArray(goalHistoryRes.data)) {
+            histories = goalHistoryRes.data;
+          } else if (goalHistoryRes.status === "success" && Array.isArray(goalHistoryRes.data)) {
+            histories = goalHistoryRes.data;
+          } else if (goalHistoryRes.data && Array.isArray(goalHistoryRes.data.transactions)) {
+            histories = goalHistoryRes.data.transactions;
+          } else if (Array.isArray(goalHistoryRes.transactions)) {
+            histories = goalHistoryRes.transactions;
+          }
+        }
+
+        const cleanHistories = Array.isArray(histories) ? histories.filter(Boolean) : [];
+
+        const processedGoals = goalsRes.data.map(goal => {
+          const goalHistories = cleanHistories.filter(item => {
+            const itemGoalId = (item && item.goal_id && typeof item.goal_id === 'object')
+              ? (item.goal_id._id || item.goal_id.id)
+              : (item && item.goal_id);
+            return itemGoalId === goal.id || itemGoalId === goal._id;
+          });
+
+          const calculatedCurrent = goalHistories.reduce((sum, item) => {
+            const amt = item ? (Number(item.amount) || 0) : 0;
+            return item && item.type === "withdraw" ? sum - amt : sum + amt;
+          }, 0);
+
+          return {
+            ...goal,
+            current: calculatedCurrent,
+            transactions: goalHistories.map(item => ({
+              _id: item._id || item.id,
+              id: item.id || item._id,
+              name: item.type === "withdraw" ? "Penarikan Dana" : "Tabungan Masuk",
+              amount: item.amount,
+              type: item.type === "withdraw" ? "expense" : "income",
+              date: item.date,
+              category_id: "cat_5"
+            }))
+          };
+        });
+
+        setGoals(processedGoals);
+      }
       return true;
     } catch (err) {
       console.error("Error loading user dashboard details:", err);
@@ -260,9 +333,7 @@ export default function App() {
         method: "POST",
         body: goalData
       });
-      if (res?.data) {
-        setGoals(prev => [...prev, res.data]);
-      }
+      await fetchUserData();
     } catch (err) {
       console.error("Failed to add goal:", err);
     }
@@ -273,7 +344,7 @@ export default function App() {
       await apiRequest(`/goals/${goalId}`, {
         method: "DELETE"
       });
-      setGoals(prev => prev.filter(g => g.id !== goalId && g._id !== goalId));
+      await fetchUserData();
     } catch (err) {
       console.error("Failed to delete goal:", err);
     }
@@ -285,9 +356,7 @@ export default function App() {
         method: "PUT",
         body: goalData
       });
-      if (res?.data) {
-        setGoals(prev => prev.map(g => (g._id === goalId || g.id === goalId) ? res.data : g));
-      }
+      await fetchUserData();
     } catch (err) {
       console.error("Failed to update goal:", err);
     }
@@ -397,9 +466,11 @@ export default function App() {
   if (authState === "loading") {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center gap-4">
-        <div className="w-10 h-10 rounded-lg bg-emerald-500 flex items-center justify-center text-white font-extrabold text-xl shadow-md animate-bounce">
-          S
-        </div>
+        <img
+          src="/logo.png"
+          alt="Sakuin Logo"
+          className="w-12 h-12 object-contain shadow-md rounded-xl animate-bounce"
+        />
         <p className="text-slate-400 text-xs font-semibold tracking-wider uppercase animate-pulse">
           Memuat Sakuin Platform...
         </p>
@@ -439,9 +510,9 @@ export default function App() {
           loading={loading}
           isBalanceShow={isBalanceShow}
           setIsBalanceShow={setIsBalanceShow}
-          onSeedData={handleSeedData}
           onNavigateToTab={handleTabChange}
           onNavigateToWallet={handleNavigateToWallet}
+          onNavigateToGoal={handleNavigateToGoal}
           onAddTransactionClick={() => handleTriggerManual(null, "manual")}
         />
       )}
@@ -467,6 +538,7 @@ export default function App() {
           isBalanceShow={isBalanceShow}
           setIsBalanceShow={setIsBalanceShow}
           onNavigateToWallet={handleNavigateToWallet}
+          onNavigateToGoal={handleNavigateToGoal}
         />
       )}
 
@@ -505,6 +577,19 @@ export default function App() {
         />
       )}
 
+      {activeTab === "goal-detail" && (
+        <GoalDetail
+          goalId={activeGoalId}
+          wallets={wallets}
+          transactions={transactions}
+          categories={categories}
+          onDeleteGoal={handleDeleteGoal}
+          onBack={() => handleTabChange("portfolio")}
+          isBalanceShow={isBalanceShow}
+          onRefreshData={fetchUserData}
+        />
+      )}
+
       {/* OVERLAY MODALS */}
       {showVoice && (
         <SakuVoice
@@ -529,7 +614,9 @@ export default function App() {
         <TransactionForms
           wallets={wallets}
           categories={categories}
+          goals={goals}
           onSubmitTransaction={handleSubmitTransaction}
+          onRefreshData={fetchUserData}
           onClose={() => {
             setShowManual(false);
             setManualFormInitialWalletId(null);

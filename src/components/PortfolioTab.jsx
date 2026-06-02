@@ -13,7 +13,8 @@ export default function PortfolioTab({
   onUpdateGoal,
   isBalanceShow,
   setIsBalanceShow,
-  onNavigateToWallet
+  onNavigateToWallet,
+  onNavigateToGoal
 }) {
   // Modal visibility states
   const [showAddWallet, setShowAddWallet] = useState(false);
@@ -296,7 +297,7 @@ export default function PortfolioTab({
                 return (
                   <div
                     key={goal.id}
-                    onClick={() => setSelectedGoal(goal)}
+                    onClick={() => onNavigateToGoal && onNavigateToGoal(goal._id || goal.id)}
                     className="bg-white rounded-3xl p-5 border border-slate-100/50 shadow-md hover:scale-[1.01] transition-transform duration-200 cursor-pointer text-left flex flex-col justify-between h-38 relative overflow-hidden"
                   >
                     <div className="flex items-center gap-3">

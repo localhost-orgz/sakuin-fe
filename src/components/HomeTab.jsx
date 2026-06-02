@@ -11,9 +11,9 @@ export default function HomeTab({
   loading,
   isBalanceShow,
   setIsBalanceShow,
-  onSeedData,
   onNavigateToTab,
   onNavigateToWallet,
+  onNavigateToGoal,
   onAddTransactionClick
 }) {
   const formatIDR = (value) => {
@@ -420,24 +420,6 @@ export default function HomeTab({
                 </div>
               )}
             </div>
-
-            {/* Test Seeder Strip */}
-            <div className="bg-emerald-50/40 border border-[#c4f5e6]/70 rounded-2xl p-3 flex items-center justify-between gap-3 mt-4">
-              <div className="text-left">
-                <span className="text-[9px] font-bold text-[#00bf71] uppercase tracking-wider block">
-                  Visual Seeder
-                </span>
-                <p className="text-[10px] text-slate-500 leading-tight mt-0.5">
-                  Seed 8 transactions to explore dashboard charts.
-                </p>
-              </div>
-              <button
-                onClick={onSeedData}
-                className="bg-white border border-[#00bf71]/20 hover:bg-[#00bf71]/5 text-[#00bf71] text-[10px] font-bold px-3 py-1.5 rounded-full transition-all cursor-pointer whitespace-nowrap shadow-sm"
-              >
-                Seed Data
-              </button>
-            </div>
           </div>
 
           {/* Active Goals Progress */}
@@ -474,7 +456,8 @@ export default function HomeTab({
                   return (
                     <div
                       key={goal.id}
-                      className="bg-white border border-slate-100 rounded-2xl p-4 shadow-sm min-w-[200px] flex flex-col gap-3 shrink-0"
+                      onClick={() => onNavigateToGoal && onNavigateToGoal(goal.id || goal._id)}
+                      className="bg-white border border-slate-100 rounded-2xl p-4 shadow-sm min-w-[200px] flex flex-col gap-3 shrink-0 cursor-pointer hover:shadow-md hover:border-slate-200 transition-all"
                     >
                       <div className="flex items-center gap-2">
                         <div
