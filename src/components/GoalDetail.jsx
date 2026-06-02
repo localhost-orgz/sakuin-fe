@@ -11,7 +11,8 @@ export default function GoalDetail({
   onDeleteGoal,
   onBack,
   isBalanceShow,
-  onRefreshData
+  onRefreshData,
+  goals = []
 }) {
   const [search, setSearch] = useState("");
   const [showSettings, setShowSettings] = useState(false);
@@ -50,11 +51,44 @@ export default function GoalDetail({
       }
 
       if (goalData) {
-        // Extract transactions list from history array or transactions array
-        const rawTxs = Array.isArray(goalData.history) 
-          ? goalData.history 
-          : (Array.isArray(goalData.transactions) ? goalData.transactions : []);
-        
+        // Try fetching goal-history as the primary source
+        let rawTxs = [];
+        try {
+          const historyResponse = await apiRequest(`/goal-history/${goalId}`);
+          if (historyResponse) {
+            if (Array.isArray(historyResponse)) {
+              rawTxs = historyResponse;
+            } else if (Array.isArray(historyResponse.data)) {
+              rawTxs = historyResponse.data;
+            } else if (historyResponse.status === "success" && Array.isArray(historyResponse.data)) {
+              rawTxs = historyResponse.data;
+            } else if (historyResponse.data && Array.isArray(historyResponse.data.transactions)) {
+              rawTxs = historyResponse.data.transactions;
+            } else if (Array.isArray(historyResponse.transactions)) {
+              rawTxs = historyResponse.transactions;
+            }
+          }
+        } catch (err) {
+          console.warn("Failed to fetch goal transactions history, falling back:", err);
+        }
+
+        // If history call was empty, check goalData's history and transactions
+        if (rawTxs.length === 0) {
+          if (Array.isArray(goalData.history) && goalData.history.length > 0) {
+            rawTxs = goalData.history;
+          } else if (Array.isArray(goalData.transactions) && goalData.transactions.length > 0) {
+            rawTxs = goalData.transactions;
+          }
+        }
+
+        // Fallback to local goals state prop if both are empty/missing
+        if (rawTxs.length === 0 && Array.isArray(goals)) {
+          const matchedGoal = goals.find(g => g.id === goalId || g._id === goalId);
+          if (matchedGoal && Array.isArray(matchedGoal.transactions)) {
+            rawTxs = matchedGoal.transactions;
+          }
+        }
+
         const mappedTxs = rawTxs
           .filter(item => item && typeof item === "object")
           .map(item => {
@@ -97,7 +131,7 @@ export default function GoalDetail({
     } finally {
       setLoading(false);
     }
-  }, [goalId]);
+  }, [goalId, goals]);
 
   useEffect(() => {
     fetchGoalDetail();

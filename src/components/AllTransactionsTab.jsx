@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from "react";
-import { Search, Filter, X, Trash2, Calendar, TrendingUp, TrendingDown, ArrowRightLeft } from "lucide-react";
+import { Search, Filter, X, Trash2, Calendar, TrendingUp, TrendingDown, ArrowRightLeft, FileSpreadsheet, FileText } from "lucide-react";
 import { getWalletTheme } from "../hooks/useWalletTheme";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -76,6 +76,9 @@ export default function AllTransactionsTab({
   const [search, setSearch] = useState("");
   const [activeFilter, setActiveFilter] = useState("all");
   const [showFilterBar, setShowFilterBar] = useState(true);
+  const [exportModal, setExportModal] = useState({ isOpen: false, type: "" });
+  const [exportStartDate, setExportStartDate] = useState("");
+  const [exportEndDate, setExportEndDate] = useState("");
 
   // Category filter items
   const filterChips = useMemo(() => {
@@ -121,6 +124,253 @@ export default function AllTransactionsTab({
       return s + (t.type?.toLowerCase() === "income" ? amt : -amt);
     }, 0);
   }, [filtered]);
+
+  const exportToExcel = () => {
+    if (filtered.length === 0) return;
+    setExportStartDate("");
+    setExportEndDate("");
+    setExportModal({ isOpen: true, type: "excel" });
+  };
+
+  const exportToPDF = () => {
+    if (filtered.length === 0) return;
+    setExportStartDate("");
+    setExportEndDate("");
+    setExportModal({ isOpen: true, type: "pdf" });
+  };
+
+  const handleConfirmExport = (type) => {
+    const dataToExport = filtered.filter(tx => {
+      if (!tx.date) return true;
+      const txDateStr = getLocalDateString(tx.date);
+      if (exportStartDate && txDateStr < exportStartDate) return false;
+      if (exportEndDate && txDateStr > exportEndDate) return false;
+      return true;
+    });
+
+    if (dataToExport.length === 0) {
+      alert("Tidak ada transaksi dalam rentang tanggal tersebut.");
+      return;
+    }
+
+    if (type === "excel") {
+      runExcelExport(dataToExport);
+    } else {
+      const exportNetFlow = dataToExport.reduce((s, t) => {
+        if (t.type?.toLowerCase() === "transfer") return s;
+        const amt = Number(t.amount) || 0;
+        return s + (t.type?.toLowerCase() === "income" ? amt : -amt);
+      }, 0);
+      runPDFExport(dataToExport, exportNetFlow);
+    }
+
+    setExportModal({ isOpen: false, type: "" });
+  };
+
+  const runExcelExport = async (dataToExport) => {
+    try {
+      const XLSX = await import("xlsx-js-style");
+      
+      const rows = dataToExport.map((tx, idx) => {
+        const matchedCat = categories.find(c => c._id === tx.category_id || c.id === tx.category_id);
+        const matchedWallet = wallets.find(w => w._id === tx.wallet_id || w.id === tx.wallet_id);
+        
+        let typeLabel = "Pemasukan";
+        if (tx.type === "expense") typeLabel = "Pengeluaran";
+        else if (tx.type === "transfer") typeLabel = "Transfer";
+
+        return {
+          "No": idx + 1,
+          "Tanggal": getLocalDateString(tx.date),
+          "Nama Transaksi": tx.name || "",
+          "Kategori": matchedCat?.name || "Kategori",
+          "Dompet": matchedWallet?.name || "Dompet",
+          "Tipe": typeLabel,
+          "Jumlah (IDR)": Number(tx.amount) || 0,
+          "Keterangan": tx.description || "-"
+        };
+      });
+
+      const worksheet = XLSX.utils.json_to_sheet(rows);
+
+      // Define styled header (Green background with White bold text)
+      const headerStyle = {
+        font: { name: "Segoe UI", sz: 10, bold: true, color: { rgb: "FFFFFF" } },
+        fill: { patternType: "solid", fgColor: { rgb: "00BF71" } }, // Sakuin Green: #00bf71
+        alignment: { horizontal: "center", vertical: "center" }
+      };
+
+      const cellStyle = {
+        font: { name: "Segoe UI", sz: 10 },
+        alignment: { vertical: "center" }
+      };
+      
+      const numStyle = {
+        font: { name: "Segoe UI", sz: 10 },
+        alignment: { horizontal: "right", vertical: "center" },
+        numFmt: "#,##0" // formatted as number with thousand separator
+      };
+
+      // Apply styles to all cells
+      const range = XLSX.utils.decode_range(worksheet['!ref']);
+      for (let R = range.s.r; R <= range.e.r; ++R) {
+        for (let C = range.s.c; C <= range.e.c; ++C) {
+          const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
+          if (!worksheet[cellAddress]) continue;
+
+          if (R === 0) {
+            worksheet[cellAddress].s = headerStyle;
+          } else {
+            if (C === 6) { // "Jumlah (IDR)" column
+              worksheet[cellAddress].s = numStyle;
+            } else {
+              worksheet[cellAddress].s = cellStyle;
+            }
+          }
+        }
+      }
+
+      // Column widths
+      const colWidths = [
+        { wch: 6 },   // No
+        { wch: 14 },  // Tanggal
+        { wch: 28 },  // Nama Transaksi
+        { wch: 18 },  // Kategori
+        { wch: 18 },  // Dompet
+        { wch: 14 },  // Tipe
+        { wch: 16 },  // Jumlah (IDR)
+        { wch: 32 }   // Keterangan
+      ];
+      worksheet['!cols'] = colWidths;
+
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Transaksi");
+      XLSX.writeFile(workbook, `Sakuin_Transaksi_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    } catch (error) {
+      console.error("Gagal memuat modul Excel:", error);
+      alert("Gagal memuat modul ekspor Excel. Silakan coba lagi.");
+    }
+  };
+
+  const runPDFExport = async (dataToExport, exportNetFlow) => {
+    try {
+      const { jsPDF } = await import("jspdf");
+      const { default: autoTable } = await import("jspdf-autotable");
+      
+      const doc = new jsPDF({
+        orientation: "portrait",
+        unit: "mm",
+        format: "a4",
+      });
+
+      // Add branding headers
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(18);
+      doc.setTextColor(0, 191, 113); // Sakuin Green
+      doc.text("SAKUIN", 14, 20);
+      
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(10);
+      doc.setTextColor(100, 116, 139); // slate-500
+      doc.text("Laporan Riwayat Transaksi Keuangan", 14, 25);
+      
+      const todayStr = new Date().toLocaleDateString("id-ID", {
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+      });
+      doc.text(`Tanggal Ekspor: ${todayStr}`, 14, 30);
+
+      // Summary block background
+      doc.setFillColor(248, 250, 252); // slate-50
+      doc.rect(14, 35, 182, 18, "F");
+      
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(9);
+      doc.setTextColor(71, 85, 105); // slate-600
+      doc.text("RINGKASAN LAPORAN", 18, 41);
+      
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
+      doc.text(`Jumlah Transaksi: ${dataToExport.length}`, 18, 47);
+      
+      const totalText = `Arus Bersih: ${exportNetFlow >= 0 ? "+" : ""}${formatRupiah(exportNetFlow)}`;
+      doc.setFont("helvetica", "bold");
+      if (exportNetFlow >= 0) {
+        doc.setTextColor(0, 191, 113); // Sakuin Green
+      } else {
+        doc.setTextColor(244, 63, 94); // rose-500
+      }
+      doc.text(totalText, 120, 47);
+
+      // Table headers
+      const headers = [["No", "Tanggal", "Nama Transaksi", "Kategori", "Dompet", "Tipe", "Jumlah"]];
+      const tableData = dataToExport.map((tx, idx) => {
+        const matchedCat = categories.find(c => c._id === tx.category_id || c.id === tx.category_id);
+        const matchedWallet = wallets.find(w => w._id === tx.wallet_id || w.id === tx.wallet_id);
+        
+        let typeLabel = "Pemasukan";
+        if (tx.type === "expense") typeLabel = "Pengeluaran";
+        else if (tx.type === "transfer") typeLabel = "Transfer";
+
+        const sign = tx.type === "expense" ? "-" : tx.type === "income" ? "+" : "";
+
+        return [
+          idx + 1,
+          getLocalDateString(tx.date),
+          tx.name || "",
+          matchedCat?.name || "Kategori",
+          matchedWallet?.name || "Dompet",
+          typeLabel,
+          `${sign}${formatRupiah(tx.amount).replace("Rp", "").trim()}`
+        ];
+      });
+
+      autoTable(doc, {
+        startY: 58,
+        head: headers,
+        body: tableData,
+        theme: "striped",
+        headStyles: {
+          fillColor: [0, 191, 113],
+          textColor: [255, 255, 255],
+          fontSize: 9,
+          fontStyle: "bold",
+        },
+        bodyStyles: {
+          fontSize: 8,
+          textColor: [51, 65, 85],
+        },
+        alternateRowStyles: {
+          fillColor: [248, 250, 252],
+        },
+        columnStyles: {
+          0: { cellWidth: 10 },
+          1: { cellWidth: 22 },
+          2: { cellWidth: 50 },
+          3: { cellWidth: 25 },
+          4: { cellWidth: 25 },
+          5: { cellWidth: 22 },
+          6: { cellWidth: 28, halign: "right" },
+        },
+        styles: {
+          font: "helvetica",
+        },
+        margin: { top: 58, left: 14, right: 14 },
+        didDrawPage: (data) => {
+          const str = "Halaman " + doc.internal.getNumberOfPages();
+          doc.setFontSize(8);
+          doc.setTextColor(148, 163, 184);
+          doc.text(str, data.settings.margin.left, doc.internal.pageSize.height - 10);
+        }
+      });
+
+      doc.save(`Sakuin_Transaksi_${new Date().toISOString().slice(0, 10)}.pdf`);
+    } catch (error) {
+      console.error("Gagal memuat modul PDF:", error);
+      alert("Gagal memuat modul ekspor PDF. Silakan coba lagi.");
+    }
+  };
 
   const handleDelete = (txId, txName) => {
     const confirmDelete = window.confirm(`Apakah Anda yakin ingin menghapus transaksi "${txName}"? Tindakan ini tidak dapat dibatalkan.`);
@@ -207,14 +457,38 @@ export default function AllTransactionsTab({
         )}
 
         {/* ─── SUMMARY CARD ─── */}
-        <div className="bg-white rounded-2xl px-6 py-4 shadow-md border border-slate-100/50 flex justify-between items-center text-xs font-extrabold">
-          <span className="text-slate-400 uppercase tracking-widest">{filtered.length} Transaksi Ditemukan</span>
-          <div className="flex items-center gap-1.5">
-            <span className="text-slate-400 uppercase tracking-widest mr-1">Arus Bersih:</span>
-            <span className={totalFiltered >= 0 ? "text-[#00bf71]" : "text-rose-500"}>
-              {totalFiltered >= 0 ? "+" : "-"}
-              {formatRupiah(Math.abs(totalFiltered))}
-            </span>
+        <div className="bg-white rounded-2xl p-5 shadow-md border border-slate-100/50 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs font-extrabold">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+            <span className="text-slate-400 uppercase tracking-widest">{filtered.length} Transaksi Ditemukan</span>
+            <div className="hidden sm:block h-4 w-px bg-slate-200" />
+            <div className="flex items-center gap-1.5">
+              <span className="text-slate-400 uppercase tracking-widest mr-1">Arus Bersih:</span>
+              <span className={totalFiltered >= 0 ? "text-[#00bf71]" : "text-rose-500"}>
+                {totalFiltered >= 0 ? "+" : "-"}
+                {formatRupiah(Math.abs(totalFiltered))}
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={exportToExcel}
+              disabled={filtered.length === 0}
+              className="flex items-center gap-1.5 px-3 py-2 bg-emerald-50 text-[#00bf71] hover:bg-[#00bf71] hover:text-white transition-all rounded-xl border border-emerald-100 hover:border-[#00bf71] cursor-pointer text-[11px] font-bold disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-emerald-50 disabled:hover:text-[#00bf71] disabled:hover:border-emerald-100"
+              title="Ekspor ke Excel (.xlsx)"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5" />
+              <span>Excel</span>
+            </button>
+            <button
+              onClick={exportToPDF}
+              disabled={filtered.length === 0}
+              className="flex items-center gap-1.5 px-3 py-2 bg-rose-50 text-rose-600 hover:bg-rose-500 hover:text-white transition-all rounded-xl border border-rose-100 hover:border-rose-500 cursor-pointer text-[11px] font-bold disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-rose-50 disabled:hover:text-rose-600 disabled:hover:border-rose-100"
+              title="Ekspor ke PDF (.pdf)"
+            >
+              <FileText className="w-3.5 h-3.5" />
+              <span>PDF</span>
+            </button>
           </div>
         </div>
 
@@ -315,6 +589,143 @@ export default function AllTransactionsTab({
           )}
         </div>
       </div>
+
+      {/* ─── EXPORT DATE RANGE MODAL ─── */}
+      {exportModal.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white rounded-3xl w-full max-w-md p-6 shadow-2xl border border-slate-100 flex flex-col gap-5 text-left animate-scale-up">
+            <div className="flex justify-between items-center">
+              <h3 className="text-lg font-extrabold text-slate-800">
+                Ekspor ke {exportModal.type === "excel" ? "Excel (.xlsx)" : "PDF (.pdf)"}
+              </h3>
+              <button
+                onClick={() => setExportModal({ isOpen: false, type: "" })}
+                className="p-1.5 hover:bg-slate-100 rounded-xl text-slate-400 hover:text-slate-600 transition-all cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-500 font-medium">
+              Pilih rentang tanggal untuk data transaksi yang ingin Anda ekspor. Saringan kategori dan pencarian aktif tetap akan diterapkan.
+            </p>
+
+            {/* Presets Grid */}
+            <div className="grid grid-cols-2 gap-2 text-xs font-bold text-slate-600">
+              <button
+                type="button"
+                onClick={() => {
+                  setExportStartDate("");
+                  setExportEndDate("");
+                }}
+                className={`py-2 px-3 border rounded-xl hover:bg-slate-50 transition-all cursor-pointer ${
+                  !exportStartDate && !exportEndDate
+                    ? "border-[#00bf71] bg-emerald-50/50 text-[#00bf71]"
+                    : "border-slate-100"
+                }`}
+              >
+                Semua Tanggal
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const now = new Date();
+                  const start = new Date(now.getFullYear(), now.getMonth(), 1);
+                  const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+                  setExportStartDate(getLocalDateString(start));
+                  setExportEndDate(getLocalDateString(end));
+                }}
+                className={`py-2 px-3 border rounded-xl hover:bg-slate-50 transition-all cursor-pointer ${
+                  exportStartDate === getLocalDateString(new Date(new Date().getFullYear(), new Date().getMonth(), 1))
+                    ? "border-[#00bf71] bg-emerald-50/50 text-[#00bf71]"
+                    : "border-slate-100"
+                }`}
+              >
+                Bulan Ini
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const now = new Date();
+                  const start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+                  const end = new Date(now.getFullYear(), now.getMonth(), 0);
+                  setExportStartDate(getLocalDateString(start));
+                  setExportEndDate(getLocalDateString(end));
+                }}
+                className={`py-2 px-3 border rounded-xl hover:bg-slate-50 transition-all cursor-pointer ${
+                  exportStartDate === getLocalDateString(new Date(new Date().getFullYear(), new Date().getMonth() - 1, 1))
+                    ? "border-[#00bf71] bg-emerald-50/50 text-[#00bf71]"
+                    : "border-slate-100"
+                }`}
+              >
+                Bulan Lalu
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const end = new Date();
+                  const start = new Date();
+                  start.setDate(end.getDate() - 30);
+                  setExportStartDate(getLocalDateString(start));
+                  setExportEndDate(getLocalDateString(end));
+                }}
+                className={`py-2 px-3 border rounded-xl hover:bg-slate-50 transition-all cursor-pointer ${
+                  exportStartDate === getLocalDateString(new Date(new Date().setDate(new Date().getDate() - 30)))
+                    ? "border-[#00bf71] bg-emerald-50/50 text-[#00bf71]"
+                    : "border-slate-100"
+                }`}
+              >
+                30 Hari Terakhir
+              </button>
+            </div>
+
+            {/* Custom Inputs */}
+            <div className="flex items-center gap-3">
+              <div className="flex-1 flex flex-col gap-1.5">
+                <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest">Dari Tanggal</label>
+                <div className="bg-slate-50 border border-slate-100 rounded-xl px-3 py-2 text-xs flex items-center">
+                  <input
+                    type="date"
+                    value={exportStartDate}
+                    onChange={(e) => setExportStartDate(e.target.value)}
+                    className="w-full bg-transparent border-none text-slate-700 font-bold focus:outline-none cursor-pointer"
+                  />
+                </div>
+              </div>
+              <div className="mt-5 text-slate-300 font-bold">─</div>
+              <div className="flex-1 flex flex-col gap-1.5">
+                <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest">Sampai Tanggal</label>
+                <div className="bg-slate-50 border border-slate-100 rounded-xl px-3 py-2 text-xs flex items-center">
+                  <input
+                    type="date"
+                    value={exportEndDate}
+                    onChange={(e) => setExportEndDate(e.target.value)}
+                    className="w-full bg-transparent border-none text-slate-700 font-bold focus:outline-none cursor-pointer"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex items-center gap-3 mt-2">
+              <button
+                type="button"
+                onClick={() => setExportModal({ isOpen: false, type: "" })}
+                className="flex-1 py-3 bg-slate-50 hover:bg-slate-100 border border-slate-100 text-slate-500 rounded-2xl text-xs font-bold transition-all cursor-pointer text-center"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={() => handleConfirmExport(exportModal.type)}
+                className="flex-1 py-3 bg-[#00bf71] hover:bg-[#009b5c] text-white rounded-2xl text-xs font-bold shadow-md shadow-emerald-500/25 transition-all cursor-pointer text-center"
+              >
+                Ekspor Sekarang
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

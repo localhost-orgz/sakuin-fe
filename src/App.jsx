@@ -44,9 +44,15 @@ const getGoalIdFromPath = (path) => {
 export default function App() {
   // Auth navigation states: 'onboarding' | 'signin' | 'authenticated' | 'loading'
   const [authState, setAuthState] = useState("loading");
-  const [activeTab, setActiveTab] = useState(() => getTabFromPath(window.location.pathname));
-  const [activeWalletId, setActiveWalletId] = useState(() => getWalletIdFromPath(window.location.pathname));
-  const [activeGoalId, setActiveGoalId] = useState(() => getGoalIdFromPath(window.location.pathname));
+  const [activeTab, setActiveTab] = useState(() =>
+    getTabFromPath(window.location.pathname),
+  );
+  const [activeWalletId, setActiveWalletId] = useState(() =>
+    getWalletIdFromPath(window.location.pathname),
+  );
+  const [activeGoalId, setActiveGoalId] = useState(() =>
+    getGoalIdFromPath(window.location.pathname),
+  );
   const [isBalanceShow, setIsBalanceShow] = useState(true);
 
   // Core Data States
@@ -61,7 +67,8 @@ export default function App() {
   const [showVoice, setShowVoice] = useState(false);
   const [showSnap, setShowSnap] = useState(false);
   const [showManual, setShowManual] = useState(false);
-  const [manualFormInitialWalletId, setManualFormInitialWalletId] = useState(null);
+  const [manualFormInitialWalletId, setManualFormInitialWalletId] =
+    useState(null);
   const [manualFormInitialType, setManualFormInitialType] = useState(null);
 
   // Routing sync
@@ -138,21 +145,25 @@ export default function App() {
       // 1. Intercept Token from redirection URL query parameters
       const params = new URLSearchParams(window.location.search);
       const tokenFromUrl = params.get("token");
-      
+
       let token = tokenFromUrl;
       if (tokenFromUrl) {
         localStorage.setItem("user_token", tokenFromUrl);
         // Scrub query parameter from the browser URL to keep it clean
         params.delete("token");
         const newSearch = params.toString();
-        const cleanUrl = window.location.origin + window.location.pathname + (newSearch ? `?${newSearch}` : "");
+        const cleanUrl =
+          window.location.origin +
+          window.location.pathname +
+          (newSearch ? `?${newSearch}` : "");
         window.history.replaceState(null, "", cleanUrl);
       } else {
         token = localStorage.getItem("user_token");
       }
 
       // 2. Check if onboarding seen
-      const onboardingSeen = localStorage.getItem("sakuin_onboarding_seen") === "true";
+      const onboardingSeen =
+        localStorage.getItem("sakuin_onboarding_seen") === "true";
       if (!onboardingSeen) {
         setAuthState("onboarding");
         return;
@@ -185,23 +196,26 @@ export default function App() {
   const fetchUserData = async () => {
     setLoading(true);
     try {
-      const [userRes, walletsRes, txRes, catRes, goalsRes, goalHistoryRes] = await Promise.all([
-        apiRequest("/auth/profile"),
-        apiRequest("/wallets"),
-        apiRequest("/transaction"),
-        apiRequest("/categories"),
-        apiRequest("/goals"),
-        apiRequest("/goal-history").catch(err => {
-          console.warn("Failed to fetch goal history:", err);
-          return { data: [] };
-        })
-      ]);
+      const [userRes, walletsRes, txRes, catRes, goalsRes, goalHistoryRes] =
+        await Promise.all([
+          apiRequest("/auth/profile"),
+          apiRequest("/wallets"),
+          apiRequest("/transaction"),
+          apiRequest("/categories"),
+          apiRequest("/goals"),
+          apiRequest("/goal-history").catch((err) => {
+            console.warn("Failed to fetch goal history:", err);
+            return { data: [] };
+          }),
+        ]);
 
       if (userRes?.data) setUser(userRes.data);
       if (walletsRes?.data) setWallets(walletsRes.data);
       if (txRes?.data) {
         // Sort transactions by date descending
-        const sorted = [...txRes.data].sort((a, b) => new Date(b.date) - new Date(a.date));
+        const sorted = [...txRes.data].sort(
+          (a, b) => new Date(b.date) - new Date(a.date),
+        );
         setTransactions(sorted);
       }
       if (catRes?.data) setCategories(catRes.data);
@@ -213,42 +227,52 @@ export default function App() {
             histories = goalHistoryRes;
           } else if (Array.isArray(goalHistoryRes.data)) {
             histories = goalHistoryRes.data;
-          } else if (goalHistoryRes.status === "success" && Array.isArray(goalHistoryRes.data)) {
+          } else if (
+            goalHistoryRes.status === "success" &&
+            Array.isArray(goalHistoryRes.data)
+          ) {
             histories = goalHistoryRes.data;
-          } else if (goalHistoryRes.data && Array.isArray(goalHistoryRes.data.transactions)) {
+          } else if (
+            goalHistoryRes.data &&
+            Array.isArray(goalHistoryRes.data.transactions)
+          ) {
             histories = goalHistoryRes.data.transactions;
           } else if (Array.isArray(goalHistoryRes.transactions)) {
             histories = goalHistoryRes.transactions;
           }
         }
 
-        const cleanHistories = Array.isArray(histories) ? histories.filter(Boolean) : [];
+        const cleanHistories = Array.isArray(histories)
+          ? histories.filter(Boolean)
+          : [];
 
-        const processedGoals = goalsRes.data.map(goal => {
-          const goalHistories = cleanHistories.filter(item => {
-            const itemGoalId = (item && item.goal_id && typeof item.goal_id === 'object')
-              ? (item.goal_id._id || item.goal_id.id)
-              : (item && item.goal_id);
+        const processedGoals = goalsRes.data.map((goal) => {
+          const goalHistories = cleanHistories.filter((item) => {
+            const itemGoalId =
+              item && item.goal_id && typeof item.goal_id === "object"
+                ? item.goal_id._id || item.goal_id.id
+                : item && item.goal_id;
             return itemGoalId === goal.id || itemGoalId === goal._id;
           });
 
           const calculatedCurrent = goalHistories.reduce((sum, item) => {
-            const amt = item ? (Number(item.amount) || 0) : 0;
+            const amt = item ? Number(item.amount) || 0 : 0;
             return item && item.type === "withdraw" ? sum - amt : sum + amt;
           }, 0);
 
           return {
             ...goal,
             current: calculatedCurrent,
-            transactions: goalHistories.map(item => ({
+            transactions: goalHistories.map((item) => ({
               _id: item._id || item.id,
               id: item.id || item._id,
-              name: item.type === "withdraw" ? "Penarikan Dana" : "Tabungan Masuk",
+              name:
+                item.type === "withdraw" ? "Penarikan Dana" : "Tabungan Masuk",
               amount: item.amount,
               type: item.type === "withdraw" ? "expense" : "income",
               date: item.date,
-              category_id: "cat_5"
-            }))
+              category_id: "cat_5",
+            })),
           };
         });
 
@@ -285,13 +309,13 @@ export default function App() {
 
   const handleUpdateProfile = async (profileData) => {
     // Optimistic profile update
-    setUser(prev => ({ ...prev, ...profileData }));
-    
+    setUser((prev) => ({ ...prev, ...profileData }));
+
     // Attempt saving to BE (will fallback to localStorage under sakuin-be simulator/offline handlers)
     try {
       await apiRequest("/auth/profile", {
         method: "PUT",
-        body: profileData
+        body: profileData,
       });
     } catch (err) {
       console.warn("Failed to sync profile changes with remote API.", err);
@@ -303,10 +327,10 @@ export default function App() {
     try {
       const res = await apiRequest("/wallets", {
         method: "POST",
-        body: walletData
+        body: walletData,
       });
       if (res?.data) {
-        setWallets(prev => [...prev, res.data]);
+        setWallets((prev) => [...prev, res.data]);
       }
     } catch (err) {
       console.error("Failed to add wallet:", err);
@@ -316,9 +340,11 @@ export default function App() {
   const handleDeleteWallet = async (walletId) => {
     try {
       await apiRequest(`/wallets/${walletId}`, {
-        method: "DELETE"
+        method: "DELETE",
       });
-      setWallets(prev => prev.filter(w => w._id !== walletId && w.id !== walletId));
+      setWallets((prev) =>
+        prev.filter((w) => w._id !== walletId && w.id !== walletId),
+      );
       // Re-fetch transactions because deleted wallet transaction history was updated
       fetchUserData();
     } catch (err) {
@@ -331,7 +357,7 @@ export default function App() {
     try {
       const res = await apiRequest("/goals", {
         method: "POST",
-        body: goalData
+        body: goalData,
       });
       await fetchUserData();
     } catch (err) {
@@ -342,7 +368,7 @@ export default function App() {
   const handleDeleteGoal = async (goalId) => {
     try {
       await apiRequest(`/goals/${goalId}`, {
-        method: "DELETE"
+        method: "DELETE",
       });
       await fetchUserData();
     } catch (err) {
@@ -354,7 +380,7 @@ export default function App() {
     try {
       const res = await apiRequest(`/goals/${goalId}`, {
         method: "PUT",
-        body: goalData
+        body: goalData,
       });
       await fetchUserData();
     } catch (err) {
@@ -367,10 +393,10 @@ export default function App() {
     try {
       const res = await apiRequest("/categories", {
         method: "POST",
-        body: catData
+        body: catData,
       });
       if (res?.data) {
-        setCategories(prev => [...prev, res.data]);
+        setCategories((prev) => [...prev, res.data]);
       }
     } catch (err) {
       console.error("Failed to add category:", err);
@@ -380,9 +406,11 @@ export default function App() {
   const handleDeleteCategory = async (catId) => {
     try {
       await apiRequest(`/categories/${catId}`, {
-        method: "DELETE"
+        method: "DELETE",
       });
-      setCategories(prev => prev.filter(c => c._id !== catId && c.id !== catId));
+      setCategories((prev) =>
+        prev.filter((c) => c._id !== catId && c.id !== catId),
+      );
     } catch (err) {
       console.error("Failed to delete category:", err);
     }
@@ -393,7 +421,7 @@ export default function App() {
     try {
       await apiRequest("/transaction", {
         method: "POST",
-        body: txData
+        body: txData,
       });
       await fetchUserData();
     } catch (err) {
@@ -404,9 +432,11 @@ export default function App() {
   const handleDeleteTransaction = async (txId) => {
     try {
       await apiRequest(`/transaction/${txId}`, {
-        method: "DELETE"
+        method: "DELETE",
       });
-      setTransactions(prev => prev.filter(t => t._id !== txId && t.id !== txId));
+      setTransactions((prev) =>
+        prev.filter((t) => t._id !== txId && t.id !== txId),
+      );
       fetchUserData();
     } catch (err) {
       console.error("Failed to delete transaction:", err);
@@ -416,31 +446,124 @@ export default function App() {
   // ─── DUMMY DATA SEEDER ───
   const handleSeedData = async () => {
     if (wallets.length === 0 || categories.length === 0) {
-      alert("Silakan buat dompet dan kategori terlebih dahulu sebelum melakukan seeding!");
+      alert(
+        "Silakan buat dompet dan kategori terlebih dahulu sebelum melakukan seeding!",
+      );
       return;
     }
 
     const defaultWalletId = wallets[0]._id || wallets[0].id;
-    
+
     // Find food & investment category id if available
-    const foodCat = categories.find(c => c.name.toLowerCase().includes("makan") || c.name.toLowerCase().includes("minum")) || categories[0];
-    const shopCat = categories.find(c => c.name.toLowerCase().includes("belanja")) || categories[0];
-    const entCat = categories.find(c => c.name.toLowerCase().includes("hibur") || c.name.toLowerCase().includes("nonton")) || categories[0];
-    const billCat = categories.find(c => c.name.toLowerCase().includes("tagih")) || categories[0];
-    const invCat = categories.find(c => c.name.toLowerCase().includes("invest") || c.name.toLowerCase().includes("gaji")) || categories[0];
+    const foodCat =
+      categories.find(
+        (c) =>
+          c.name.toLowerCase().includes("makan") ||
+          c.name.toLowerCase().includes("minum"),
+      ) || categories[0];
+    const shopCat =
+      categories.find((c) => c.name.toLowerCase().includes("belanja")) ||
+      categories[0];
+    const entCat =
+      categories.find(
+        (c) =>
+          c.name.toLowerCase().includes("hibur") ||
+          c.name.toLowerCase().includes("nonton"),
+      ) || categories[0];
+    const billCat =
+      categories.find((c) => c.name.toLowerCase().includes("tagih")) ||
+      categories[0];
+    const invCat =
+      categories.find(
+        (c) =>
+          c.name.toLowerCase().includes("invest") ||
+          c.name.toLowerCase().includes("gaji"),
+      ) || categories[0];
 
     const seedItems = [
       // Mei Transactions (Total expense: 9.05 jt, Income: 10 jt)
-      { name: "Gaji Utama Mei", amount: 10000000, type: "income", date: "2026-05-01", category_id: invCat._id || invCat.id, wallet_id: defaultWalletId, description: "Gaji bulanan korporat", input_method: "manual" },
-      { name: "Beli Laptop Asus", amount: 7500000, type: "expense", date: "2026-05-04", category_id: shopCat._id || shopCat.id, wallet_id: defaultWalletId, description: "Upgrade laptop kerja", input_method: "manual" },
-      { name: "Belanja Bulanan Supermarket", amount: 1200000, type: "expense", date: "2026-05-10", category_id: foodCat._id || foodCat.id, wallet_id: defaultWalletId, description: "Stok bahan makanan bulanan", input_method: "manual" },
-      { name: "Nonton Bioskop & Snack", amount: 350000, type: "expense", date: "2026-05-15", category_id: entCat._id || entCat.id, wallet_id: defaultWalletId, description: "Cinema XXI weekend", input_method: "manual" },
-      
+      {
+        name: "Gaji Utama Mei",
+        amount: 10000000,
+        type: "income",
+        date: "2026-05-01",
+        category_id: invCat._id || invCat.id,
+        wallet_id: defaultWalletId,
+        description: "Gaji bulanan korporat",
+        input_method: "manual",
+      },
+      {
+        name: "Beli Laptop Asus",
+        amount: 7500000,
+        type: "expense",
+        date: "2026-05-04",
+        category_id: shopCat._id || shopCat.id,
+        wallet_id: defaultWalletId,
+        description: "Upgrade laptop kerja",
+        input_method: "manual",
+      },
+      {
+        name: "Belanja Bulanan Supermarket",
+        amount: 1200000,
+        type: "expense",
+        date: "2026-05-10",
+        category_id: foodCat._id || foodCat.id,
+        wallet_id: defaultWalletId,
+        description: "Stok bahan makanan bulanan",
+        input_method: "manual",
+      },
+      {
+        name: "Nonton Bioskop & Snack",
+        amount: 350000,
+        type: "expense",
+        date: "2026-05-15",
+        category_id: entCat._id || entCat.id,
+        wallet_id: defaultWalletId,
+        description: "Cinema XXI weekend",
+        input_method: "manual",
+      },
+
       // April Transactions (Total expense: 4.3 jt, Income: 8 jt)
-      { name: "Gaji Freelance April", amount: 8000000, type: "income", date: "2026-04-05", category_id: invCat._id || invCat.id, wallet_id: defaultWalletId, description: "Proyek sampingan web app", input_method: "manual" },
-      { name: "Sewa Kost April", amount: 2000000, type: "expense", date: "2026-04-08", category_id: billCat._id || billCat.id, wallet_id: defaultWalletId, description: "Pembayaran kost bulanan", input_method: "manual" },
-      { name: "Makan Bersama Keluarga", amount: 1500000, type: "expense", date: "2026-04-18", category_id: foodCat._id || foodCat.id, wallet_id: defaultWalletId, description: "Ulang tahun ibu", input_method: "manual" },
-      { name: "Beli Baju Kemeja", amount: 800000, type: "expense", date: "2026-04-22", category_id: shopCat._id || shopCat.id, wallet_id: defaultWalletId, description: "Pakaian kerja baru", input_method: "manual" }
+      {
+        name: "Gaji Freelance April",
+        amount: 8000000,
+        type: "income",
+        date: "2026-04-05",
+        category_id: invCat._id || invCat.id,
+        wallet_id: defaultWalletId,
+        description: "Proyek sampingan web app",
+        input_method: "manual",
+      },
+      {
+        name: "Sewa Kost April",
+        amount: 2000000,
+        type: "expense",
+        date: "2026-04-08",
+        category_id: billCat._id || billCat.id,
+        wallet_id: defaultWalletId,
+        description: "Pembayaran kost bulanan",
+        input_method: "manual",
+      },
+      {
+        name: "Makan Bersama Keluarga",
+        amount: 1500000,
+        type: "expense",
+        date: "2026-04-18",
+        category_id: foodCat._id || foodCat.id,
+        wallet_id: defaultWalletId,
+        description: "Ulang tahun ibu",
+        input_method: "manual",
+      },
+      {
+        name: "Beli Baju Kemeja",
+        amount: 800000,
+        type: "expense",
+        date: "2026-04-22",
+        category_id: shopCat._id || shopCat.id,
+        wallet_id: defaultWalletId,
+        description: "Pakaian kerja baru",
+        input_method: "manual",
+      },
     ];
 
     setLoading(true);
@@ -449,12 +572,14 @@ export default function App() {
       for (const item of seedItems) {
         await apiRequest("/transaction", {
           method: "POST",
-          body: item
+          body: item,
         });
       }
       // Re-fetch dashboard states to update everything
       await fetchUserData();
-      alert("⚡ Dummy transaksi Mei dan April berhasil dimasukkan untuk visualisasi grafik!");
+      alert(
+        "⚡ Dummy transaksi Mei dan April berhasil dimasukkan untuk visualisasi grafik!",
+      );
     } catch (err) {
       console.error("Gagal melakukan seeder data:", err);
     } finally {
@@ -583,6 +708,7 @@ export default function App() {
           wallets={wallets}
           transactions={transactions}
           categories={categories}
+          goals={goals}
           onDeleteGoal={handleDeleteGoal}
           onBack={() => handleTabChange("portfolio")}
           isBalanceShow={isBalanceShow}
