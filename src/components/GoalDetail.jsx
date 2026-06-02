@@ -17,9 +17,26 @@ export default function GoalDetail({
   const [search, setSearch] = useState("");
   const [showSettings, setShowSettings] = useState(false);
   const [sheetView, setSheetView] = useState("options"); // "options" | "edit"
-  const [localTransactions, setLocalTransactions] = useState([]);
-  const [goal, setGoal] = useState(null);
-  const [loading, setLoading] = useState(true);
+  // Find initial goal from props
+  const initialGoal = useMemo(() => {
+    return goals.find(g => g.id === goalId || g._id === goalId);
+  }, [goals, goalId]);
+
+  const [goal, setGoal] = useState(initialGoal);
+  const [localTransactions, setLocalTransactions] = useState(
+    initialGoal && Array.isArray(initialGoal.transactions) ? initialGoal.transactions : []
+  );
+  const [loading, setLoading] = useState(!initialGoal);
+
+  // Sync with prop updates
+  useEffect(() => {
+    if (initialGoal) {
+      setGoal(initialGoal);
+      if (Array.isArray(initialGoal.transactions)) {
+        setLocalTransactions(initialGoal.transactions);
+      }
+    }
+  }, [initialGoal]);
 
   const goalsRef = useRef(goals);
   useEffect(() => {
@@ -47,7 +64,7 @@ export default function GoalDetail({
 
     const runFetch = async () => {
       try {
-        if (!cancelled) setLoading(true);
+        if (!cancelled && !initialGoal) setLoading(true);
         const response = await apiRequest(`/goals/${goalId}`);
         let goalData = null;
         if (response) {
@@ -132,7 +149,7 @@ export default function GoalDetail({
         }
       } catch (error) {
         console.error("Failed to fetch goal detail:", error);
-        if (!cancelled) {
+        if (!cancelled && !initialGoal) {
           setGoal(null);
           setLocalTransactions([]);
         }
@@ -146,7 +163,7 @@ export default function GoalDetail({
     return () => {
       cancelled = true;
     };
-  }, [goalId]);
+  }, [goalId, initialGoal]);
 
   useEffect(() => {
     const cleanup = fetchGoalDetail();
