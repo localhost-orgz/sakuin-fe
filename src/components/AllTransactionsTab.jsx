@@ -67,6 +67,24 @@ const groupByDate = (txs) => {
     }));
 };
 
+const findCategory = (tx, categories) => {
+  if (!tx || !tx.category_id) return null;
+  if (typeof tx.category_id === "object") {
+    const id = tx.category_id._id || tx.category_id.id;
+    return categories.find(c => c._id === id || c.id === id) || tx.category_id;
+  }
+  return categories.find(c => c._id === tx.category_id || c.id === tx.category_id);
+};
+
+const findWallet = (tx, wallets) => {
+  if (!tx || !tx.wallet_id) return null;
+  if (typeof tx.wallet_id === "object") {
+    const id = tx.wallet_id._id || tx.wallet_id.id;
+    return wallets.find(w => w._id === id || w.id === id) || tx.wallet_id;
+  }
+  return wallets.find(w => w._id === tx.wallet_id || w.id === tx.wallet_id);
+};
+
 export default function AllTransactionsTab({
   transactions = [],
   wallets = [],
@@ -95,7 +113,7 @@ export default function AllTransactionsTab({
   // Search & category filter logic
   const filtered = useMemo(() => {
     return transactions.filter((tx) => {
-      const wallet = wallets.find((w) => (w._id === tx.wallet_id || w.id === tx.wallet_id));
+      const wallet = findWallet(tx, wallets);
       const walletName = wallet ? wallet.name : "Dompet";
 
       const matchesSearch =
@@ -172,8 +190,8 @@ export default function AllTransactionsTab({
       const XLSX = await import("xlsx-js-style");
       
       const rows = dataToExport.map((tx, idx) => {
-        const matchedCat = categories.find(c => c._id === tx.category_id || c.id === tx.category_id);
-        const matchedWallet = wallets.find(w => w._id === tx.wallet_id || w.id === tx.wallet_id);
+        const matchedCat = findCategory(tx, categories);
+        const matchedWallet = findWallet(tx, wallets);
         
         let typeLabel = "Pemasukan";
         if (tx.type === "expense") typeLabel = "Pengeluaran";
@@ -183,8 +201,8 @@ export default function AllTransactionsTab({
           "No": idx + 1,
           "Tanggal": getLocalDateString(tx.date),
           "Nama Transaksi": tx.name || "",
-          "Kategori": matchedCat?.name || "Kategori",
-          "Dompet": matchedWallet?.name || "Dompet",
+          "Kategori": matchedCat?.name || "Lainnya",
+          "Dompet": matchedWallet?.name || "Utama",
           "Tipe": typeLabel,
           "Jumlah (IDR)": Number(tx.amount) || 0,
           "Keterangan": tx.description || "-"
@@ -306,8 +324,8 @@ export default function AllTransactionsTab({
       // Table headers
       const headers = [["No", "Tanggal", "Nama Transaksi", "Kategori", "Dompet", "Tipe", "Jumlah"]];
       const tableData = dataToExport.map((tx, idx) => {
-        const matchedCat = categories.find(c => c._id === tx.category_id || c.id === tx.category_id);
-        const matchedWallet = wallets.find(w => w._id === tx.wallet_id || w.id === tx.wallet_id);
+        const matchedCat = findCategory(tx, categories);
+        const matchedWallet = findWallet(tx, wallets);
         
         let typeLabel = "Pemasukan";
         if (tx.type === "expense") typeLabel = "Pengeluaran";
@@ -319,8 +337,8 @@ export default function AllTransactionsTab({
           idx + 1,
           getLocalDateString(tx.date),
           tx.name || "",
-          matchedCat?.name || "Kategori",
-          matchedWallet?.name || "Dompet",
+          matchedCat?.name || "Lainnya",
+          matchedWallet?.name || "Utama",
           typeLabel,
           `${sign}${formatRupiah(tx.amount).replace("Rp", "").trim()}`
         ];
@@ -517,8 +535,8 @@ export default function AllTransactionsTab({
                 {/* Section Transaction Cards */}
                 <div className="bg-white rounded-3xl shadow-sm border border-slate-100/50 overflow-hidden divide-y divide-slate-100">
                   {section.data.map((tx) => {
-                    const matchedCat = categories.find(c => c._id === tx.category_id || c.id === tx.category_id);
-                    const matchedWallet = wallets.find(w => w._id === tx.wallet_id || w.id === tx.wallet_id);
+                    const matchedCat = findCategory(tx, categories);
+                    const matchedWallet = findWallet(tx, wallets);
                     
                     const isExpense = tx.type === "expense";
                     const isTransfer = tx.type === "transfer";
@@ -554,7 +572,7 @@ export default function AllTransactionsTab({
                               {tx.name}
                             </h4>
                             <span className="text-[10px] text-slate-400 font-bold block mt-0.5 uppercase tracking-wider">
-                              {matchedCat?.name || "Kategori"} • {matchedWallet?.name || "Dompet"}
+                              {matchedCat?.name || "Lainnya"} • {matchedWallet?.name || "Utama"}
                             </span>
                           </div>
                         </div>

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback } from "react";
+import React, { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { ChevronLeft, MoreHorizontal, Search, TrendingUp, TrendingDown, Target, Trash2, X, Calendar, Edit2, Check } from "lucide-react";
 import { getWalletGradient, getWalletTheme, getWalletThemeIds } from "../hooks/useWalletTheme";
 import { apiRequest } from "../utils/api";
@@ -21,6 +21,11 @@ export default function GoalDetail({
   const [goal, setGoal] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  const goalsRef = useRef(goals);
+  useEffect(() => {
+    goalsRef.current = goals;
+  }, [goals]);
+
   // Edit Form States
   const [editName, setEditName] = useState("");
   const [editTarget, setEditTarget] = useState("");
@@ -33,108 +38,121 @@ export default function GoalDetail({
   ];
 
   // Fetch goal details and transactions from API
-  const fetchGoalDetail = useCallback(async (retries = 2) => {
+  const fetchGoalDetail = useCallback(() => {
     if (!goalId || goalId === "undefined" || goalId === "null") {
       return;
     }
 
-    try {
-      setLoading(true);
-      const response = await apiRequest(`/goals/${goalId}`);
-      let goalData = null;
-      if (response) {
-        if (response.data) {
-          goalData = response.data;
-        } else if (response.id || response._id) {
-          goalData = response;
-        }
-      }
+    let cancelled = false;
 
-      if (goalData) {
-        // Try fetching goal-history as the primary source
-        let rawTxs = [];
-        try {
-          const historyResponse = await apiRequest(`/goal-history/${goalId}`);
-          if (historyResponse) {
-            if (Array.isArray(historyResponse)) {
-              rawTxs = historyResponse;
-            } else if (Array.isArray(historyResponse.data)) {
-              rawTxs = historyResponse.data;
-            } else if (historyResponse.status === "success" && Array.isArray(historyResponse.data)) {
-              rawTxs = historyResponse.data;
-            } else if (historyResponse.data && Array.isArray(historyResponse.data.transactions)) {
-              rawTxs = historyResponse.data.transactions;
-            } else if (Array.isArray(historyResponse.transactions)) {
-              rawTxs = historyResponse.transactions;
+    const runFetch = async () => {
+      try {
+        if (!cancelled) setLoading(true);
+        const response = await apiRequest(`/goals/${goalId}`);
+        let goalData = null;
+        if (response) {
+          if (response.data) {
+            goalData = response.data;
+          } else if (response.id || response._id) {
+            goalData = response;
+          }
+        }
+
+        if (goalData) {
+          // Try fetching goal-history as the primary source
+          let rawTxs = [];
+          try {
+            const historyResponse = await apiRequest(`/goal-history/${goalId}`);
+            if (historyResponse) {
+              if (Array.isArray(historyResponse)) {
+                rawTxs = historyResponse;
+              } else if (Array.isArray(historyResponse.data)) {
+                rawTxs = historyResponse.data;
+              } else if (historyResponse.status === "success" && Array.isArray(historyResponse.data)) {
+                rawTxs = historyResponse.data;
+              } else if (historyResponse.data && Array.isArray(historyResponse.data.transactions)) {
+                rawTxs = historyResponse.data.transactions;
+              } else if (Array.isArray(historyResponse.transactions)) {
+                rawTxs = historyResponse.transactions;
+              }
+            }
+          } catch (err) {
+            console.warn("Failed to fetch goal transactions history, falling back:", err);
+          }
+
+          // If history call was empty, check goalData's history and transactions
+          if (rawTxs.length === 0) {
+            if (Array.isArray(goalData.history) && goalData.history.length > 0) {
+              rawTxs = goalData.history;
+            } else if (Array.isArray(goalData.transactions) && goalData.transactions.length > 0) {
+              rawTxs = goalData.transactions;
             }
           }
-        } catch (err) {
-          console.warn("Failed to fetch goal transactions history, falling back:", err);
-        }
 
-        // If history call was empty, check goalData's history and transactions
-        if (rawTxs.length === 0) {
-          if (Array.isArray(goalData.history) && goalData.history.length > 0) {
-            rawTxs = goalData.history;
-          } else if (Array.isArray(goalData.transactions) && goalData.transactions.length > 0) {
-            rawTxs = goalData.transactions;
+          // Fallback to local goals state prop if both are empty/missing
+          if (rawTxs.length === 0 && Array.isArray(goalsRef.current)) {
+            const matchedGoal = goalsRef.current.find(g => g.id === goalId || g._id === goalId);
+            if (matchedGoal && Array.isArray(matchedGoal.transactions)) {
+              rawTxs = matchedGoal.transactions;
+            }
           }
-        }
 
-        // Fallback to local goals state prop if both are empty/missing
-        if (rawTxs.length === 0 && Array.isArray(goals)) {
-          const matchedGoal = goals.find(g => g.id === goalId || g._id === goalId);
-          if (matchedGoal && Array.isArray(matchedGoal.transactions)) {
-            rawTxs = matchedGoal.transactions;
+          const mappedTxs = rawTxs
+            .filter(item => item && typeof item === "object")
+            .map(item => {
+              const type = item.type === "withdraw" ? "expense" : "income";
+              const name = item.name || (item.type === "withdraw" ? "Penarikan Dana" : "Tabungan Masuk");
+              return {
+                ...item,
+                id: item.id || item._id,
+                _id: item._id || item.id,
+                name,
+                type,
+                amount: Number(item.amount) || 0,
+                date: item.date,
+                category_id: item.category_id || "cat_5"
+              };
+            });
+
+          // Calculate dynamic current amount from history
+          const calculatedCurrent = mappedTxs.reduce((sum, item) => {
+            const amt = Number(item.amount) || 0;
+            return item.type === "expense" ? sum - amt : sum + amt;
+          }, 0);
+
+          if (!cancelled) {
+            setGoal({
+              ...goalData,
+              current: calculatedCurrent
+            });
+            setLocalTransactions(mappedTxs);
           }
+        } else {
+          throw new Error("Goal data not found in response");
         }
-
-        const mappedTxs = rawTxs
-          .filter(item => item && typeof item === "object")
-          .map(item => {
-            const type = item.type === "withdraw" ? "expense" : "income";
-            const name = item.name || (item.type === "withdraw" ? "Penarikan Dana" : "Tabungan Masuk");
-            return {
-              ...item,
-              id: item.id || item._id,
-              _id: item._id || item.id,
-              name,
-              type,
-              amount: Number(item.amount) || 0,
-              date: item.date,
-              category_id: item.category_id || "cat_5"
-            };
-          });
-
-        // Calculate dynamic current amount from history
-        const calculatedCurrent = mappedTxs.reduce((sum, item) => {
-          const amt = Number(item.amount) || 0;
-          return item.type === "expense" ? sum - amt : sum + amt;
-        }, 0);
-
-        setGoal({
-          ...goalData,
-          current: calculatedCurrent
-        });
-        setLocalTransactions(mappedTxs);
-      } else {
-        throw new Error("Goal data not found in response");
+      } catch (error) {
+        console.error("Failed to fetch goal detail:", error);
+        if (!cancelled) {
+          setGoal(null);
+          setLocalTransactions([]);
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
       }
-    } catch (error) {
-      console.error(`Failed to fetch goal detail (${retries} retries left):`, error);
-      if (retries > 0) {
-        await new Promise(resolve => setTimeout(resolve, 1500));
-        return fetchGoalDetail(retries - 1);
-      }
-      setGoal(null);
-      setLocalTransactions([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [goalId, goals]);
+    };
+
+    runFetch();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [goalId]);
 
   useEffect(() => {
-    fetchGoalDetail();
+    const cleanup = fetchGoalDetail();
+    return () => {
+      if (cleanup) cleanup();
+    };
   }, [fetchGoalDetail]);
 
   // Load goal details into edit form states
