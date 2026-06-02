@@ -9,11 +9,6 @@ export default function SignIn({ onLogin }) {
     window.location.href = authUrl;
   };
 
-  const handleBypassLogin = () => {
-    localStorage.setItem("user_token", "mock_token_sakuin_web_2026");
-    onLogin();
-  };
-
   return (
     <div className="min-h-screen bg-gradient-to-t from-[#c4f5e6] to-[#ffffff] flex flex-col items-center justify-between p-6 font-sans select-none overflow-hidden relative">
       {/* Top spacer */}
@@ -29,8 +24,8 @@ export default function SignIn({ onLogin }) {
             className="w-12 h-12 object-contain shadow-lg shadow-emerald-500/10 rounded-2xl animate-bounce"
           />
           <div>
-            <h2 className="text-xl font-extrabold text-slate-800 tracking-tight">Sakuin</h2>
-            <p className="text-[9px] text-[#00bf71] font-extrabold uppercase tracking-widest text-center mt-0.5">Finance Tracker</p>
+            <h2 className="text-xl font-bold text-slate-800 tracking-tight">Sakuin</h2>
+            <p className="text-[9px] text-[#00bf71] font-bold uppercase tracking-widest text-center mt-0.5">Finance Tracker</p>
           </div>
         </div>
 
@@ -44,14 +39,14 @@ export default function SignIn({ onLogin }) {
               className="w-16 h-16 rounded-full border-4 border-white shadow-md hover:scale-105 transition-transform"
             />
             <div className="bg-white border-2 border-slate-100 py-3 px-6 -ml-3 rounded-3xl rounded-tl-none shadow-md">
-              <span className="text-sm font-extrabold text-slate-700">Hi, Welcome Back! 👋</span>
+              <span className="text-sm font-bold text-slate-700">Hi, Welcome Back! 👋</span>
             </div>
           </div>
 
           {/* Row 2 — second bubble + avatar */}
           <div className="flex flex-row items-center justify-end pr-4 animate-slide-left [animation-delay:300ms]">
             <div className="bg-white border-2 border-slate-100 py-3 px-6 -mr-3 rounded-3xl rounded-tr-none shadow-md">
-              <span className="text-sm font-extrabold text-slate-700">Hello again, Sakuin! 🚀</span>
+              <span className="text-sm font-bold text-slate-700">Hello again, Sakuin! 🚀</span>
             </div>
             <img
               src={authImage2}
@@ -64,7 +59,7 @@ export default function SignIn({ onLogin }) {
         {/* Login CTA Card */}
         <div className="w-full bg-white/75 backdrop-blur-md border-2 border-white rounded-3xl p-6 shadow-xl space-y-5 animate-slide-up [animation-delay:500ms] text-center">
           <div className="space-y-1">
-            <h3 className="text-lg font-extrabold text-slate-800">Ready to dive in?</h3>
+            <h3 className="text-lg font-bold text-slate-800">Ready to dive in?</h3>
             <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">Access your workspace below</p>
           </div>
 
@@ -72,7 +67,7 @@ export default function SignIn({ onLogin }) {
             {/* Google Login button */}
             <button
               onClick={handleGoogleLogin}
-              className="w-full flex items-center justify-center gap-3 bg-white hover:bg-slate-50 text-slate-700 font-extrabold py-3.5 px-6 rounded-2xl border-2 border-slate-100 shadow-md hover:shadow-lg transition-all active:scale-[0.98] text-xs cursor-pointer"
+              className="w-full flex items-center justify-center gap-3 bg-white hover:bg-slate-50 text-slate-700 font-bold py-3.5 px-6 rounded-2xl border-2 border-slate-100 shadow-md hover:shadow-lg transition-all active:scale-[0.98] text-xs cursor-pointer"
             >
               <img
                 src="https://image.similarpng.com/file/similarpng/very-thumbnail/2020/06/Logo-google-icon-PNG.png"
@@ -80,14 +75,6 @@ export default function SignIn({ onLogin }) {
                 className="w-5 h-5 object-contain"
               />
               Continue with Google
-            </button>
-
-            {/* Direct Bypass Button */}
-            <button
-              onClick={handleBypassLogin}
-              className="w-full bg-[#00bf71] hover:bg-[#00a862] text-white font-extrabold py-3.5 px-6 rounded-2xl shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/35 transition-all active:scale-[0.98] text-xs cursor-pointer"
-            >
-              Bypass & Enter Workspace
             </button>
           </div>
 
@@ -99,7 +86,7 @@ export default function SignIn({ onLogin }) {
       </div>
 
       {/* Footer */}
-      <div className="text-slate-400 text-[10px] font-extrabold uppercase tracking-widest relative z-10">
+      <div className="text-slate-400 text-[10px] font-bold uppercase tracking-widest relative z-10">
         Sakuin Workspace • © 2026
       </div>
     </div>
