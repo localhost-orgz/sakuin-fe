@@ -160,7 +160,7 @@ export default function HomeTab({
                   className="w-full h-full object-cover"
                 />
               ) : (
-                <div className="text-2xl font-black text-white">
+                <div className="text-2xl font-bold text-white">
                   {user?.name ? user.name[0].toUpperCase() : "S"}
                 </div>
               )}
@@ -201,7 +201,7 @@ export default function HomeTab({
               Income
             </span>
             <div className="mt-2 flex flex-col justify-between h-full">
-              <div className="flex items-baseline text-2xl font-black text-slate-800 text-left">
+              <div className="flex items-baseline text-2xl font-bold text-slate-800 text-left">
                 <span className="text-sm font-semibold text-slate-400 mr-0.5">Rp</span>
                 {isBalanceShow ? formatIDR(monthlyIncome).replace("Rp", "").trim() : "••••••••"}
               </div>
@@ -221,7 +221,7 @@ export default function HomeTab({
               Expense
             </span>
             <div className="mt-2 flex flex-col justify-between h-full">
-              <div className="flex items-baseline text-2xl font-black text-slate-800 text-left">
+              <div className="flex items-baseline text-2xl font-bold text-slate-800 text-left">
                 <span className="text-sm font-semibold text-slate-400 mr-0.5">Rp</span>
                 {isBalanceShow ? formatIDR(monthlyExpense).replace("Rp", "").trim() : "••••••••"}
               </div>
@@ -621,7 +621,7 @@ export default function HomeTab({
 
                     <div className="text-right shrink-0">
                       <span
-                        className={`text-sm font-black block ${
+                        className={`text-sm font-bold block ${
                           isExpense
                             ? "text-rose-500"
                             : isTransfer

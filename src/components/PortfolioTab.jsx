@@ -257,7 +257,7 @@ export default function PortfolioTab({
 
                     <div className="relative z-10 text-left">
                       <h4 className="font-extrabold text-sm opacity-90 truncate max-w-[180px]">{wallet.name}</h4>
-                      <span className="text-2xl font-black block leading-none mt-1">
+                      <span className="text-2xl font-bold block leading-none mt-1">
                         {isBalanceShow ? formatIDR(wallet.balance) : "Rp ••••••••"}
                       </span>
                     </div>

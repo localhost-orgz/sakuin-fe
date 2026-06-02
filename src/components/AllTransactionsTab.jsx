@@ -288,7 +288,7 @@ export default function AllTransactionsTab({
                         {/* Right Info Column + Action */}
                         <div className="flex items-center gap-4">
                           <div className="text-right shrink-0 leading-tight">
-                            <span style={{ color: amountColor }} className="text-sm font-black">
+                            <span style={{ color: amountColor }} className="text-sm font-bold">
                               {amountSign}
                               {formatRupiah(tx.amount).replace("Rp", "").trim()}
                             </span>

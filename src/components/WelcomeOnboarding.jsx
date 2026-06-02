@@ -57,9 +57,7 @@ export default function WelcomeOnboarding({ onFinish }) {
       {/* Top Navigation Row */}
       <div className="flex justify-between items-center max-w-lg mx-auto w-full py-4 relative z-10">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-xl bg-[#00bf71] flex items-center justify-center text-white font-extrabold text-sm shadow-md">
-            S
-          </div>
+          <img src="/logo.png" alt="Sakuin Logo" className="w-8 h-8 object-contain shadow-md rounded-xl" />
           <span className="text-xs font-extrabold text-slate-700 tracking-tight">Sakuin Onboarding</span>
         </div>
 
@@ -91,7 +89,7 @@ export default function WelcomeOnboarding({ onFinish }) {
 
           {/* Slide Texts */}
           <div className="space-y-3 px-4">
-            <h2 className="text-2xl font-black text-slate-800 tracking-tight leading-none">
+            <h2 className="text-2xl font-bold text-slate-800 tracking-tight leading-none">
               {SLIDES[activeIndex].title}
             </h2>
             <p className="text-sm text-slate-400 font-semibold leading-relaxed max-w-xs mx-auto">

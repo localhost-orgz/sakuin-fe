@@ -672,7 +672,7 @@ export default function AnalyticsTab({ transactions = [], categories = [] }) {
             <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">
               Total Expense
             </span>
-            <span className="text-lg font-black text-[#00bf71] block">
+            <span className="text-lg font-bold text-[#00bf71] block">
               {rp(totalExpense)}
             </span>
           </div>
@@ -708,7 +708,7 @@ export default function AnalyticsTab({ transactions = [], categories = [] }) {
                     {/* Tooltip above active bar */}
                     {bar.isSel && (
                       <div
-                        className="absolute z-20 px-1.5 py-0.5 text-[9px] font-black text-white rounded shadow-md pointer-events-none transition-all duration-205"
+                        className="absolute z-20 px-1.5 py-0.5 text-[9px] font-bold text-white rounded shadow-md pointer-events-none transition-all duration-205"
                         style={{
                           backgroundColor: bar.frontColor,
                           bottom: `${pct}%`,
@@ -813,7 +813,7 @@ export default function AnalyticsTab({ transactions = [], categories = [] }) {
                 <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block truncate max-w-[120px]">
                   {selectedCatObj ? selectedCatObj.label : "Total"}
                 </span>
-                <span className="text-sm font-black text-slate-800 block mt-0.5 whitespace-nowrap">
+                <span className="text-sm font-bold text-slate-800 block mt-0.5 whitespace-nowrap">
                   {rpShort(totalExpense)}
                 </span>
               </div>

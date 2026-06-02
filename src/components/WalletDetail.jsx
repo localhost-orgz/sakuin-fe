@@ -268,7 +268,7 @@ export default function WalletDetail({
             {/* Wallet Balance Display */}
             <div className="mt-2 flex items-baseline gap-1">
               <span className="text-lg font-bold">Rp</span>
-              <span className="text-3xl md:text-4xl font-black tracking-tight">
+              <span className="text-3xl md:text-4xl font-bold tracking-tight">
                 {isBalanceShow ? formatIDR(wallet.balance).replace("Rp", "").trim() : "••••••••"}
               </span>
             </div>
@@ -393,7 +393,7 @@ export default function WalletDetail({
                         <div className="text-right shrink-0">
                           <span 
                             style={{ color: iconColor }}
-                            className="text-sm font-black"
+                            className="text-sm font-bold"
                           >
                             {isExpense ? "-" : isTransfer ? "" : "+"}
                             {formatIDR(tx.amount).replace("Rp", "").trim()}

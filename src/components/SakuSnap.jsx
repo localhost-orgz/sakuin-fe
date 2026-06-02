@@ -72,13 +72,17 @@ export default function SakuSnap({
         audio: false
       });
       setStream(mediaStream);
-      if (videoRef.current) {
-        videoRef.current.srcObject = mediaStream;
-      }
     } catch (err) {
       console.warn("Webcam access rejected or unavailable, falling back to file upload.", err);
     }
   };
+
+  // Bind stream to video element when it renders in the DOM
+  useEffect(() => {
+    if (stream && videoRef.current) {
+      videoRef.current.srcObject = stream;
+    }
+  }, [stream]);
 
   const stopCamera = () => {
     if (stream) {
@@ -392,6 +396,7 @@ export default function SakuSnap({
                       ref={videoRef}
                       autoPlay
                       playsInline
+                      muted
                       className="w-full h-full object-cover transform scale-x-100"
                     />
                     <button
@@ -455,7 +460,7 @@ export default function SakuSnap({
               </div>
 
               <div className="space-y-2">
-                <div className="flex items-center justify-center gap-2 text-emerald-600 font-black">
+                <div className="flex items-center justify-center gap-2 text-emerald-600 font-bold">
                   <Loader2 className="w-5 h-5 animate-spin" />
                   <span>SakuOCR Membaca Data...</span>
                 </div>
@@ -582,7 +587,7 @@ export default function SakuSnap({
                       {f !== "Saya" && (
                         <button
                           onClick={() => setFriends(friends.filter(name => name !== f))}
-                          className="ml-1.5 hover:text-rose-600 text-slate-400 font-black cursor-pointer"
+                          className="ml-1.5 hover:text-rose-600 text-slate-400 font-bold cursor-pointer"
                         >
                           ×
                         </button>
