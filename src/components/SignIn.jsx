@@ -23,9 +23,11 @@ export default function SignIn({ onLogin }) {
       <div className="max-w-md w-full flex flex-col items-center gap-12 relative z-10 py-10">
         {/* Brand Header */}
         <div className="flex flex-col items-center gap-2">
-          <div className="w-12 h-12 rounded-2xl bg-[#00bf71] flex items-center justify-center text-white font-extrabold text-2xl shadow-lg shadow-emerald-500/25 animate-bounce">
-            S
-          </div>
+          <img
+            src="/logo.png"
+            alt="Sakuin Logo"
+            className="w-12 h-12 object-contain shadow-lg shadow-emerald-500/10 rounded-2xl animate-bounce"
+          />
           <div>
             <h2 className="text-xl font-extrabold text-slate-800 tracking-tight">Sakuin</h2>
             <p className="text-[9px] text-[#00bf71] font-extrabold uppercase tracking-widest text-center mt-0.5">Finance Tracker</p>

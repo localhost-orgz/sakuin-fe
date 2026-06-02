@@ -26,9 +26,7 @@ export default function DashboardLayout({
         <div className="space-y-8">
           {/* Logo */}
           <div className="flex items-center gap-2 px-2">
-            <div className="w-8 h-8 rounded-lg bg-[#00bf71] flex items-center justify-center text-white font-bold text-lg">
-              S
-            </div>
+            <img src="/logo.png" alt="Sakuin Logo" className="w-8 h-8 object-contain" />
             <span className="text-xl font-extrabold text-slate-800 tracking-tight">Sakuin</span>
           </div>
 
@@ -92,7 +90,6 @@ export default function DashboardLayout({
             />
             <div className="text-left leading-tight">
               <p className="text-sm font-bold text-slate-800 line-clamp-1">{user?.name || "User"}</p>
-              <p className="text-xs text-slate-400">Personal Plan</p>
             </div>
           </div>
           <button
@@ -108,9 +105,7 @@ export default function DashboardLayout({
       {/* ────────────────── MOBILE HEADER ────────────────── */}
       <header className="md:hidden flex items-center justify-between bg-white border-b border-slate-100 px-4 py-3.5 sticky top-0 z-20">
         <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-lg bg-[#00bf71] flex items-center justify-center text-white font-bold text-md">
-            S
-          </div>
+          <img src="/logo.png" alt="Sakuin Logo" className="w-7 h-7 object-contain" />
           <span className="text-md font-extrabold text-slate-800 tracking-tight">Sakuin</span>
         </div>
         <div className="flex items-center gap-2">

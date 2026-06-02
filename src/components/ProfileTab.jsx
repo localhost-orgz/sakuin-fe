@@ -366,54 +366,6 @@ export default function ProfileTab({
           </div>
         </div>
 
-        {/* ─── ABOUT / DEV CREDITS CARD ─── */}
-        <div className="bg-gradient-to-tr from-emerald-50/50 to-white rounded-3xl p-6 shadow-lg border border-slate-100/50 space-y-6">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-xl bg-[#00bf71] flex items-center justify-center text-white font-extrabold text-sm shadow-md">
-              S
-            </div>
-            <div>
-              <h4 className="font-extrabold text-base text-slate-800">About Sakuin Workspace</h4>
-              <p className="text-[9px] text-[#00bf71] font-extrabold uppercase tracking-widest">Version 2.0 • Web Remake</p>
-            </div>
-          </div>
-
-          <p className="text-xs text-slate-500 leading-relaxed">
-            Sakuin Web is a clean, modern financial application inspired by the **Sakuin mobile app (built in React Native)**. 
-            It is designed to give you a gorgeous, intuitive dashboard workspace interface to document, track, and review your finances.
-          </p>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="bg-white/80 border-2 border-slate-50 rounded-2xl p-4">
-              <span className="text-[9px] text-[#00bf71] font-extrabold uppercase tracking-widest block pl-0.5">Technology Stack</span>
-              <p className="text-xs text-slate-700 font-extrabold mt-1">
-                React 19 + Vite 8 • Tailwind CSS v4 • Lucide Icons
-              </p>
-            </div>
-            <div className="bg-white/80 border-2 border-slate-50 rounded-2xl p-4">
-              <span className="text-[9px] text-[#00bf71] font-extrabold uppercase tracking-widest block pl-0.5">Data & Storage Sync</span>
-              <p className="text-xs text-slate-700 font-extrabold mt-1">
-                API Backend Vercel Endpoint + LocalStorage fallback
-              </p>
-            </div>
-          </div>
-
-          <div className="border-t border-slate-100 pt-5 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="text-center sm:text-left">
-              <span className="text-slate-400 font-extrabold block uppercase tracking-widest text-[9px]">Developed by</span>
-              <span className="font-extrabold text-slate-700">PJBL Kelompok Semester 4</span>
-            </div>
-            
-            <a
-              href="https://github.com"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-2 bg-white border-2 border-slate-100 text-slate-600 font-extrabold py-2 px-4 rounded-full text-xs hover:border-[#00bf71] hover:text-[#00bf71] transition-all cursor-pointer shadow-sm"
-            >
-              <GitFork className="w-4 h-4" /> View Repository
-            </a>
-          </div>
-        </div>
       </div>
     </div>
   );
