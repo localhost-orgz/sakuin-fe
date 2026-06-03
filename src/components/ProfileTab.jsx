@@ -57,6 +57,7 @@ export default function ProfileTab({
     onAddCategory({
       name: catName.trim(),
       emoticon: catEmoticon,
+      color: catThemeId,
       themeId: catThemeId
     });
     setCatName("");
@@ -135,9 +136,6 @@ export default function ProfileTab({
                   <p className="text-xs text-slate-400 font-bold flex items-center justify-center sm:justify-start gap-1.5 mt-1">
                     <Mail className="w-3.5 h-3.5 text-[#00bf71]" /> {user?.email || "user@sakuin.com"}
                   </p>
-                </div>
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-[#00bf71] text-[10px] font-extrabold border border-emerald-100">
-                  <Sparkles className="w-3 h-3" /> Premium Plan
                 </div>
               </div>
               <button
