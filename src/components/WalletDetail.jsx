@@ -173,15 +173,18 @@ export default function WalletDetail({
 
     setIsSaving(true);
     try {
+      const currencyIdStr = (wallet.currency_id && typeof wallet.currency_id === "object")
+        ? (wallet.currency_id._id || wallet.currency_id.id)
+        : (wallet.currency_id || "6a02f8a7de59afc0c23a95c9");
+
       const response = await apiRequest(`/wallets/${wallet._id || wallet.id}`, {
         method: "PUT",
         body: {
           name: editName.trim(),
           color: editThemeId,
           themeId: editThemeId,
-          balance: wallet.balance,
-          currency: wallet.currency || "IDR",
-          currency_id: wallet.currency_id || "6a02f8a7de59afc0c23a95c9"
+          balance: wallet.balance || 0,
+          currency_id: currencyIdStr
         }
       });
       if (response && response.status === "success") {

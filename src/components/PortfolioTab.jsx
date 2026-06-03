@@ -108,8 +108,9 @@ export default function PortfolioTab({
     onAddWallet({
       name: walletName.trim(),
       balance: Number(walletBalance) || 0,
-      currency_id: walletCurrency,
+      currency_id: "6a02f8a7de59afc0c23a95c9",
       color: walletThemeId,
+      themeId: walletThemeId,
     });
     // Reset Form
     setWalletName("");
