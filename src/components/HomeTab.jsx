@@ -1,5 +1,12 @@
 import React, { useMemo } from "react";
-import { Eye, EyeOff, Wallet, TrendingUp, TrendingDown, Target } from "lucide-react";
+import {
+  Eye,
+  EyeOff,
+  Wallet,
+  TrendingUp,
+  TrendingDown,
+  Target,
+} from "lucide-react";
 import { getWalletGradient, getWalletTheme } from "../hooks/useWalletTheme";
 
 export default function HomeTab({
@@ -14,7 +21,7 @@ export default function HomeTab({
   onNavigateToTab,
   onNavigateToWallet,
   onNavigateToGoal,
-  onAddTransactionClick
+  onAddTransactionClick,
 }) {
   const formatIDR = (value) => {
     return new Intl.NumberFormat("id-ID", {
@@ -40,81 +47,85 @@ export default function HomeTab({
       .reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
   }, [transactions]);
 
-  const {
-    incomePercent,
-    expensePercent,
-    isIncomeUp,
-    isExpenseUp
-  } = useMemo(() => {
-    let curIncome = 0;
-    let curExpense = 0;
-    let lastIncome = 0;
-    let lastExpense = 0;
+  const { incomePercent, expensePercent, isIncomeUp, isExpenseUp } =
+    useMemo(() => {
+      let curIncome = 0;
+      let curExpense = 0;
+      let lastIncome = 0;
+      let lastExpense = 0;
 
-    const now = new Date();
-    const currentYear = now.getFullYear();
-    const currentMonth = now.getMonth();
+      const now = new Date();
+      const currentYear = now.getFullYear();
+      const currentMonth = now.getMonth();
 
-    const lastMonthDate = new Date(currentYear, currentMonth - 1, 1);
-    const lastYear = lastMonthDate.getFullYear();
-    const lastMonth = lastMonthDate.getMonth();
+      const lastMonthDate = new Date(currentYear, currentMonth - 1, 1);
+      const lastYear = lastMonthDate.getFullYear();
+      const lastMonth = lastMonthDate.getMonth();
 
-    transactions.forEach((tx) => {
-      if (!tx.date) return;
-      const txDate = new Date(tx.date);
-      const amount = Number(tx.amount) || 0;
+      transactions.forEach((tx) => {
+        if (!tx.date) return;
+        const txDate = new Date(tx.date);
+        const amount = Number(tx.amount) || 0;
 
-      if (txDate.getFullYear() === currentYear && txDate.getMonth() === currentMonth) {
-        if (tx.type === "income") {
-          curIncome += amount;
-        } else if (tx.type === "expense") {
-          curExpense += amount;
+        if (
+          txDate.getFullYear() === currentYear &&
+          txDate.getMonth() === currentMonth
+        ) {
+          if (tx.type === "income") {
+            curIncome += amount;
+          } else if (tx.type === "expense") {
+            curExpense += amount;
+          }
+        } else if (
+          txDate.getFullYear() === lastYear &&
+          txDate.getMonth() === lastMonth
+        ) {
+          if (tx.type === "income") {
+            lastIncome += amount;
+          } else if (tx.type === "expense") {
+            lastExpense += amount;
+          }
         }
-      } else if (txDate.getFullYear() === lastYear && txDate.getMonth() === lastMonth) {
-        if (tx.type === "income") {
-          lastIncome += amount;
-        } else if (tx.type === "expense") {
-          lastExpense += amount;
-        }
+      });
+
+      let incPct = 0;
+      if (lastIncome > 0) {
+        incPct = Math.round(((curIncome - lastIncome) / lastIncome) * 100);
+      } else if (curIncome > 0) {
+        incPct = 100;
       }
-    });
 
-    let incPct = 0;
-    if (lastIncome > 0) {
-      incPct = Math.round(((curIncome - lastIncome) / lastIncome) * 100);
-    } else if (curIncome > 0) {
-      incPct = 100;
-    }
+      let expPct = 0;
+      if (lastExpense > 0) {
+        expPct = Math.round(((curExpense - lastExpense) / lastExpense) * 100);
+      } else if (curExpense > 0) {
+        expPct = 100;
+      }
 
-    let expPct = 0;
-    if (lastExpense > 0) {
-      expPct = Math.round(((curExpense - lastExpense) / lastExpense) * 100);
-    } else if (curExpense > 0) {
-      expPct = 100;
-    }
-
-    return {
-      incomePercent: Math.abs(incPct),
-      expensePercent: Math.abs(expPct),
-      isIncomeUp: incPct >= 0,
-      isExpenseUp: expPct >= 0,
-    };
-  }, [transactions]);
+      return {
+        incomePercent: Math.abs(incPct),
+        expensePercent: Math.abs(expPct),
+        isIncomeUp: incPct >= 0,
+        isExpenseUp: expPct >= 0,
+      };
+    }, [transactions]);
 
   const topCategoriesData = useMemo(() => {
     const expenses = transactions.filter((t) => t.type === "expense");
     const sums = {};
 
     expenses.forEach((tx) => {
-      const catId = typeof tx.category_id === "object" && tx.category_id
-        ? tx.category_id._id || tx.category_id.id
-        : tx.category_id;
+      const catId =
+        typeof tx.category_id === "object" && tx.category_id
+          ? tx.category_id._id || tx.category_id.id
+          : tx.category_id;
       if (catId) {
         sums[catId] = (sums[catId] || 0) + (Number(tx.amount) || 0);
       }
     });
 
-    const totalExpenseAmount = Object.values(sums).reduce((a, b) => a + b, 0) || 1;
+    const totalExpenseAmount =
+      Object.values(sums).reduce((a, b) => a + b, 0) || 1;
 
     const mapped = categories.map((cat) => {
       const catId = cat._id || cat.id;
@@ -126,18 +137,22 @@ export default function HomeTab({
         emoticon: cat.emoticon || "🏷️",
         themeId: cat.themeId || "ocean",
         amount,
-        percentage: pct
+        percentage: pct,
       };
     });
 
-    return mapped.filter((c) => c.amount > 0).sort((a, b) => b.amount - a.amount);
+    return mapped
+      .filter((c) => c.amount > 0)
+      .sort((a, b) => b.amount - a.amount);
   }, [transactions, categories]);
 
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center py-24 gap-3 bg-[#f5f6fa]">
         <div className="w-10 h-10 rounded-full border-4 border-[#00bf71] border-t-transparent animate-spin" />
-        <p className="text-slate-500 text-xs font-semibold">Loading Sakuin Workspace...</p>
+        <p className="text-slate-500 text-xs font-semibold">
+          Loading Sakuin Workspace...
+        </p>
       </div>
     );
   }
@@ -202,8 +217,12 @@ export default function HomeTab({
             </span>
             <div className="mt-2 flex flex-col justify-between h-full">
               <div className="flex items-baseline text-2xl font-bold text-slate-800 text-left">
-                <span className="text-sm font-semibold text-slate-400 mr-0.5">Rp</span>
-                {isBalanceShow ? formatIDR(monthlyIncome).replace("Rp", "").trim() : "••••••••"}
+                <span className="text-sm font-semibold text-slate-400 mr-0.5">
+                  Rp
+                </span>
+                {isBalanceShow
+                  ? formatIDR(monthlyIncome).replace("Rp", "").trim()
+                  : "••••••••"}
               </div>
               <div className="flex items-center gap-1 mt-2 text-xs font-semibold text-[#00BC7D] text-left">
                 <TrendingUp className="w-4 h-4" />
@@ -222,8 +241,12 @@ export default function HomeTab({
             </span>
             <div className="mt-2 flex flex-col justify-between h-full">
               <div className="flex items-baseline text-2xl font-bold text-slate-800 text-left">
-                <span className="text-sm font-semibold text-slate-400 mr-0.5">Rp</span>
-                {isBalanceShow ? formatIDR(monthlyExpense).replace("Rp", "").trim() : "••••••••"}
+                <span className="text-sm font-semibold text-slate-400 mr-0.5">
+                  Rp
+                </span>
+                {isBalanceShow
+                  ? formatIDR(monthlyExpense).replace("Rp", "").trim()
+                  : "••••••••"}
               </div>
               <div className="flex items-center gap-1 mt-2 text-xs font-semibold text-rose-500 text-left">
                 <TrendingDown className="w-4 h-4" />
@@ -257,7 +280,9 @@ export default function HomeTab({
               </div>
             ) : (
               wallets.map((wallet) => {
-                const theme = getWalletTheme(wallet.themeId || wallet.color || "ocean");
+                const theme = getWalletTheme(
+                  wallet.themeId || wallet.color || "ocean",
+                );
                 const isDark =
                   theme.gradientColors[0].startsWith("#0") ||
                   theme.gradientColors[0].startsWith("#1") ||
@@ -265,12 +290,17 @@ export default function HomeTab({
                   theme.gradientColors[0].startsWith("#3");
 
                 // Blob colors
-                const blobColor = isDark ? "rgba(255,255,255,0.07)" : `${theme.shadowColor}22`;
-                const blobColorStrong = isDark ? "rgba(255,255,255,0.11)" : `${theme.shadowColor}38`;
+                const blobColor = isDark
+                  ? "rgba(255,255,255,0.07)"
+                  : `${theme.shadowColor}22`;
+                const blobColorStrong = isDark
+                  ? "rgba(255,255,255,0.11)"
+                  : `${theme.shadowColor}38`;
 
                 // Calculate total expense for this wallet in current month
                 const walletTx = transactions.filter(
-                  (tx) => (tx.wallet_id === wallet._id || tx.wallet_id === wallet.id)
+                  (tx) =>
+                    tx.wallet_id === wallet._id || tx.wallet_id === wallet.id,
                 );
                 const walletExpense = walletTx
                   .filter((tx) => tx.type === "expense")
@@ -281,7 +311,9 @@ export default function HomeTab({
                     key={wallet._id || wallet.id}
                     onClick={() => onNavigateToWallet(wallet._id || wallet.id)}
                     style={{
-                      background: getWalletGradient(wallet.themeId || wallet.color || "ocean"),
+                      background: getWalletGradient(
+                        wallet.themeId || wallet.color || "ocean",
+                      ),
                     }}
                     className="min-w-[285px] w-[285px] h-[175px] shrink-0 rounded-3xl p-5 relative overflow-hidden flex flex-col justify-between cursor-pointer hover:scale-[1.02] transition-transform duration-200 shadow-md"
                   >
@@ -310,25 +342,37 @@ export default function HomeTab({
                     <div className="flex items-center gap-2.5 relative z-10">
                       <div
                         style={{
-                          backgroundColor: isDark ? "rgba(255,255,255,0.1)" : `${theme.textColor}18`,
+                          backgroundColor: isDark
+                            ? "rgba(255,255,255,0.1)"
+                            : `${theme.textColor}18`,
                         }}
                         className="p-2.5 rounded-2xl flex items-center justify-center shrink-0"
                       >
                         <Wallet
                           className={`w-5 h-5`}
-                          style={isDark ? { color: "#ffffff" } : { color: theme.textColor }}
+                          style={
+                            isDark
+                              ? { color: "#ffffff" }
+                              : { color: theme.textColor }
+                          }
                         />
                       </div>
                       <div className="text-left">
                         <h3
                           className="font-bold text-sm leading-tight max-w-[150px] truncate"
-                          style={{ color: isDark ? "#ffffff" : theme.textColor }}
+                          style={{
+                            color: isDark ? "#ffffff" : theme.textColor,
+                          }}
                         >
                           {wallet.name}
                         </h3>
                         <span
                           className="text-[9px] uppercase font-bold tracking-wider block mt-0.5"
-                          style={{ color: isDark ? "rgba(255,255,255,0.5)" : `${theme.textColor}88` }}
+                          style={{
+                            color: isDark
+                              ? "rgba(255,255,255,0.5)"
+                              : `${theme.textColor}88`,
+                          }}
                         >
                           Wallet
                         </span>
@@ -338,29 +382,44 @@ export default function HomeTab({
                     <div className="relative z-10 text-left mt-auto">
                       <span
                         className="text-[9px] uppercase tracking-wider block font-bold"
-                        style={{ color: isDark ? "rgba(255,255,255,0.5)" : `${theme.textColor}88` }}
+                        style={{
+                          color: isDark
+                            ? "rgba(255,255,255,0.5)"
+                            : `${theme.textColor}88`,
+                        }}
                       >
                         Balance
                       </span>
                       <div className="flex items-baseline gap-0.5">
                         <span
                           className="text-[10px] font-bold"
-                          style={{ color: isDark ? "#ffffff" : theme.textColor }}
+                          style={{
+                            color: isDark ? "#ffffff" : theme.textColor,
+                          }}
                         >
                           Rp
                         </span>
                         <span
                           className="text-xl font-extrabold tracking-tight"
-                          style={{ color: isDark ? "#ffffff" : theme.textColor }}
+                          style={{
+                            color: isDark ? "#ffffff" : theme.textColor,
+                          }}
                         >
-                          {isBalanceShow ? formatIDR(wallet.balance).replace("Rp", "").trim() : "••••••••"}
+                          {isBalanceShow
+                            ? formatIDR(wallet.balance).replace("Rp", "").trim()
+                            : "••••••••"}
                         </span>
                       </div>
                       <span
                         className="text-[9px] block mt-1 font-bold"
-                        style={{ color: isDark ? "rgba(255,255,255,0.5)" : `${theme.textColor}88` }}
+                        style={{
+                          color: isDark
+                            ? "rgba(255,255,255,0.5)"
+                            : `${theme.textColor}88`,
+                        }}
                       >
-                        This month: Rp{formatIDR(walletExpense).replace("Rp", "").trim()}
+                        This month: Rp
+                        {formatIDR(walletExpense).replace("Rp", "").trim()}
                       </span>
                     </div>
                   </div>
@@ -394,14 +453,18 @@ export default function HomeTab({
               ) : (
                 <div className="flex overflow-x-auto gap-4 py-2 custom-scrollbar">
                   {topCategoriesData.map((cat) => {
-                    const theme = getWalletTheme(cat.themeId || cat.color || cat.theme_id || "ocean");
+                    const theme = getWalletTheme(
+                      cat.themeId || cat.color || cat.theme_id || "ocean",
+                    );
                     return (
                       <div
                         key={cat.id}
                         className="flex flex-col items-center gap-2 min-w-[70px] text-center group shrink-0"
                       >
                         <div
-                          style={{ backgroundColor: theme.iconBgColor || "#f3f4f6" }}
+                          style={{
+                            backgroundColor: theme.iconBgColor || "#f3f4f6",
+                          }}
                           className="w-12 h-12 rounded-2xl flex items-center justify-center text-xl shadow-sm transition-transform group-hover:scale-[1.05]"
                         >
                           {cat.emoticon}
@@ -411,7 +474,12 @@ export default function HomeTab({
                         </span>
                         <div className="bg-emerald-50 rounded-full px-2 py-0.5">
                           <span className="text-[9px] font-bold text-[#00BC7D] whitespace-nowrap">
-                            Rp{cat.amount >= 1000000 ? `${(cat.amount / 1000000).toFixed(1)}M` : cat.amount >= 1000 ? `${(cat.amount / 1000).toFixed(0)}k` : cat.amount}
+                            Rp
+                            {cat.amount >= 1000000
+                              ? `${(cat.amount / 1000000).toFixed(1)}M`
+                              : cat.amount >= 1000
+                                ? `${(cat.amount / 1000).toFixed(0)}k`
+                                : cat.amount}
                           </span>
                         </div>
                       </div>
@@ -426,7 +494,8 @@ export default function HomeTab({
           <div className="bg-white rounded-3xl p-6 shadow-md border border-slate-100/50 space-y-4 text-left flex flex-col">
             <div className="flex justify-between items-center">
               <h3 className="font-bold text-xs text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
-                <Target className="w-4 h-4 text-[#00bf71]" /> Active Saving Goals
+                <Target className="w-4 h-4 text-[#00bf71]" /> Active Saving
+                Goals
               </h3>
               <button
                 onClick={() => onNavigateToTab("portfolio")}
@@ -443,12 +512,16 @@ export default function HomeTab({
             ) : (
               <div className="flex overflow-x-auto gap-4 py-2 custom-scrollbar flex-1 items-center">
                 {goals.map((goal) => {
-                  const percentage = Math.min((goal.current / goal.target) * 100, 100);
+                  const percentage = Math.min(
+                    (goal.current / goal.target) * 100,
+                    100,
+                  );
                   const isCompleted = percentage >= 100;
                   const theme = getWalletTheme(goal.themeId || "ocean");
 
                   const formatAmount = (amount) => {
-                    if (amount >= 1000000) return `${(amount / 1000000).toFixed(1)}Jt`;
+                    if (amount >= 1000000)
+                      return `${(amount / 1000000).toFixed(1)}Jt`;
                     if (amount >= 1000) return `${(amount / 1000).toFixed(0)}K`;
                     return amount.toString();
                   };
@@ -456,7 +529,10 @@ export default function HomeTab({
                   return (
                     <div
                       key={goal.id}
-                      onClick={() => onNavigateToGoal && onNavigateToGoal(goal.id || goal._id)}
+                      onClick={() =>
+                        onNavigateToGoal &&
+                        onNavigateToGoal(goal.id || goal._id)
+                      }
                       className="bg-white border border-slate-100 rounded-2xl p-4 shadow-sm min-w-[200px] flex flex-col gap-3 shrink-0 cursor-pointer hover:shadow-md hover:border-slate-200 transition-all"
                     >
                       <div className="flex items-center gap-2">
@@ -471,7 +547,9 @@ export default function HomeTab({
                             {goal.name}
                           </h4>
                           <span className="text-[9px] text-slate-400 block mt-0.5">
-                            {isCompleted ? "✅ Completed" : `${percentage.toFixed(0)}% done`}
+                            {isCompleted
+                              ? "✅ Completed"
+                              : `${percentage.toFixed(0)}% done`}
                           </span>
                         </div>
                       </div>
@@ -502,7 +580,9 @@ export default function HomeTab({
                         <div
                           style={{
                             width: `${percentage}%`,
-                            backgroundColor: isCompleted ? "#00BC7D" : theme.accentColor,
+                            backgroundColor: isCompleted
+                              ? "#00BC7D"
+                              : theme.accentColor,
                           }}
                           className="h-full rounded-full"
                         />
@@ -522,7 +602,7 @@ export default function HomeTab({
               Recent Transactions
             </span>
             <button
-              onClick={() => onNavigateToTab("portfolio")}
+              onClick={() => onNavigateToTab("transactions")}
               className="text-xs text-[#00bf71] font-bold hover:underline cursor-pointer"
             >
               See All
@@ -545,10 +625,10 @@ export default function HomeTab({
             <div className="divide-y divide-slate-100">
               {transactions.slice(0, 5).map((tx) => {
                 const matchedCat = categories.find(
-                  (c) => c._id === tx.category_id || c.id === tx.category_id
+                  (c) => c._id === tx.category_id || c.id === tx.category_id,
                 );
                 const matchedWallet = wallets.find(
-                  (w) => w._id === tx.wallet_id || w.id === tx.wallet_id
+                  (w) => w._id === tx.wallet_id || w.id === tx.wallet_id,
                 );
                 const isExpense = tx.type === "expense";
                 const isTransfer = tx.type === "transfer";
@@ -608,8 +688,8 @@ export default function HomeTab({
                           isExpense
                             ? "text-rose-500"
                             : isTransfer
-                            ? "text-amber-500"
-                            : "text-[#00BC7D]"
+                              ? "text-amber-500"
+                              : "text-[#00BC7D]"
                         }`}
                       >
                         {isExpense ? "-" : isTransfer ? "" : "+"}
@@ -629,4 +709,3 @@ export default function HomeTab({
     </div>
   );
 }
-
