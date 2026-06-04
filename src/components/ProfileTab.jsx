@@ -352,7 +352,7 @@ export default function ProfileTab({
                   </div>
 
                   <button
-                    onClick={() => onDeleteCategory(cat._id || cat.id)}
+                    onClick={() => onDeleteCategory(cat.id || cat._id)}
                     title="Delete Category"
                     className="p-2 hover:bg-rose-50 rounded-full text-slate-400 hover:text-rose-600 transition-all cursor-pointer shrink-0"
                   >
