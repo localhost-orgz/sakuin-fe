@@ -781,10 +781,9 @@ export default function AnalyticsTab({ transactions = [], categories = [] }) {
                 {donutSegments.map((seg, i) => {
                   const radius = 15.915;
                   const circumference = 2 * Math.PI * radius;
-                  const strokeDasharray = `${(seg.percentage / 100) * circumference} ${circumference}`;
-                  const strokeDashoffset = `${
-                    circumference - (seg.startPct / 100) * circumference
-                  }`;
+                  const segmentLength = (seg.percentage / 100) * circumference;
+                  const strokeDasharray = `${segmentLength} ${circumference - segmentLength}`;
+                  const strokeDashoffset = `${-(seg.startPct / 100) * circumference}`;
 
                   return (
                     <circle
