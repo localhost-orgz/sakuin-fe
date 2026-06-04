@@ -352,7 +352,11 @@ export default function ProfileTab({
                   </div>
 
                   <button
-                    onClick={() => onDeleteCategory(cat.id || cat._id)}
+                    onClick={() => {
+                      if (window.confirm(`Hapus kategori "${cat.name}"? Kategori ini akan dihapus secara permanen.`)) {
+                        onDeleteCategory(cat);
+                      }
+                    }}
                     title="Delete Category"
                     className="p-2 hover:bg-rose-50 rounded-full text-slate-400 hover:text-rose-600 transition-all cursor-pointer shrink-0"
                   >

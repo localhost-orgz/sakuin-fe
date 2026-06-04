@@ -403,13 +403,14 @@ export default function App() {
     }
   };
 
-  const handleDeleteCategory = async (catId) => {
+  const handleDeleteCategory = async (catObj) => {
     try {
+      const catId = catObj.slug || catObj._id || catObj.id;
       await apiRequest(`/categories/${catId}`, {
         method: "DELETE",
       });
       setCategories((prev) =>
-        prev.filter((c) => c._id !== catId && c.id !== catId),
+        prev.filter((c) => (c._id || c.id) !== (catObj._id || catObj.id)),
       );
     } catch (err) {
       console.error("Failed to delete category:", err);
