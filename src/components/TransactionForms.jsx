@@ -16,6 +16,7 @@ export default function TransactionForms({
 }) {
   const [formType, setFormType] = useState(initialFormType || "manual"); // "manual" or "transfer"
   const [txType, setTxType] = useState("expense"); // "expense" or "income" (for manual)
+  const [errorModal, setErrorModal] = useState(null);
 
   // Manual Form States
   const [name, setName] = useState("");
@@ -89,6 +90,18 @@ export default function TransactionForms({
     if (!name.trim() || !amount || !walletId || !categoryId) return;
 
     const cleanAmountString = amount.replace(/\./g, "");
+    const txAmount = parseFloat(cleanAmountString);
+
+    if (txType === "expense") {
+      const selectedWallet = wallets.find(w => (w._id === walletId || w.id === walletId));
+      if (selectedWallet && selectedWallet.balance < txAmount) {
+        setErrorModal({
+          title: "Saldo Tidak Cukup",
+          message: `Saldo ${selectedWallet.name} Anda (${new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(selectedWallet.balance)}) tidak mencukupi untuk melakukan transaksi sebesar ${new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(txAmount)}.`
+        });
+        return;
+      }
+    }
 
     onSubmitTransaction({
       name: name.trim(),
@@ -118,8 +131,17 @@ export default function TransactionForms({
     }
 
     const cleanAmountString = transferAmount.replace(/\./g, "");
+    const txAmount = parseFloat(cleanAmountString);
 
     const sourceWallet = wallets.find(w => (w._id === sourceWalletId || w.id === sourceWalletId));
+    if (sourceWallet && sourceWallet.balance < txAmount) {
+      setErrorModal({
+        title: "Saldo Tidak Cukup",
+        message: `Saldo ${sourceWallet.name} Anda (${new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(sourceWallet.balance)}) tidak mencukupi untuk melakukan transfer sebesar ${new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(txAmount)}.`
+      });
+      return;
+    }
+
     const destWallet = wallets.find(w => (w._id === destWalletId || w.id === destWalletId));
     const sourceWalletName = sourceWallet?.name || "Wallet A";
     const destWalletName = destWallet?.name || "Wallet B";
@@ -165,6 +187,16 @@ export default function TransactionForms({
     if (!goalAmount || !goalWalletId || !selectedGoalId) return;
 
     const cleanAmountString = goalAmount.replace(/\./g, "");
+    const txAmount = parseFloat(cleanAmountString);
+
+    const selectedWallet = wallets.find(w => (w._id === goalWalletId || w.id === goalWalletId));
+    if (selectedWallet && selectedWallet.balance < txAmount) {
+      setErrorModal({
+        title: "Saldo Tidak Cukup",
+        message: `Saldo ${selectedWallet.name} Anda (${new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(selectedWallet.balance)}) tidak mencukupi untuk melakukan setoran sebesar ${new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(txAmount)}.`
+      });
+      return;
+    }
 
     try {
       await apiRequest("/goal-history", {
@@ -633,6 +665,24 @@ export default function TransactionForms({
           )
         )}
       </div>
+
+      {errorModal && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md z-[60] flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden animate-slide-up text-center border border-slate-100 p-6">
+            <div className="w-16 h-16 bg-rose-50 rounded-full flex items-center justify-center mx-auto mb-4">
+              <span className="text-rose-500 text-2xl font-bold">⚠️</span>
+            </div>
+            <h3 className="font-extrabold text-lg text-slate-800 mb-2">{errorModal.title}</h3>
+            <p className="text-sm text-slate-500 mb-6">{errorModal.message}</p>
+            <button
+              onClick={() => setErrorModal(null)}
+              className="w-full bg-[#00bf71] hover:bg-[#00a862] text-white font-extrabold py-3 rounded-full transition-all cursor-pointer shadow-md text-xs"
+            >
+              Tutup
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

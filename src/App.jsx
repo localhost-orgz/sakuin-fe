@@ -70,6 +70,7 @@ export default function App() {
   const [manualFormInitialWalletId, setManualFormInitialWalletId] =
     useState(null);
   const [manualFormInitialType, setManualFormInitialType] = useState(null);
+  const [balanceAlert, setBalanceAlert] = useState(null);
 
   // Routing sync
   useEffect(() => {
@@ -419,6 +420,23 @@ export default function App() {
 
   // ─── TRANSACTION SUBMISSION ───
   const handleSubmitTransaction = async (txData) => {
+    const isExpense = txData.type === "expense";
+    const isTransfer = txData.type === "transfer";
+    if (isExpense || isTransfer) {
+      const selectedWallet = wallets.find(
+        (w) => (w._id || w.id) === txData.wallet_id
+      );
+      if (selectedWallet) {
+        const txAmount = parseFloat(txData.amount || 0);
+        if (selectedWallet.balance < txAmount) {
+          setBalanceAlert({
+            message: `Saldo ${selectedWallet.name} tidak cukup untuk melakukan transaksi sebesar ${new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(txAmount)}.`
+          });
+          return;
+        }
+      }
+    }
+
     try {
       await apiRequest("/transaction", {
         method: "POST",
@@ -752,6 +770,24 @@ export default function App() {
           initialWalletId={manualFormInitialWalletId}
           initialFormType={manualFormInitialType}
         />
+      )}
+
+      {balanceAlert && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden animate-slide-up text-center border border-slate-100 p-6">
+            <div className="w-16 h-16 bg-rose-50 rounded-full flex items-center justify-center mx-auto mb-4">
+              <span className="text-rose-500 text-2xl font-bold">⚠️</span>
+            </div>
+            <h3 className="font-extrabold text-lg text-slate-800 mb-2">Saldo Tidak Cukup</h3>
+            <p className="text-sm text-slate-500 mb-6">{balanceAlert.message}</p>
+            <button
+              onClick={() => setBalanceAlert(null)}
+              className="w-full bg-[#00bf71] hover:bg-[#00a862] text-white font-extrabold py-3 rounded-full transition-all cursor-pointer shadow-md text-xs"
+            >
+              Tutup
+            </button>
+          </div>
+        </div>
       )}
     </DashboardLayout>
   );

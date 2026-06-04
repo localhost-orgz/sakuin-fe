@@ -14,6 +14,7 @@ export default function SakuVoice({
   const [isSupported, setIsSupported] = useState(true);
   const [errorMsg, setErrorMsg] = useState("");
   const [isTranscribing, setIsTranscribing] = useState(false);
+  const [errorModal, setErrorModal] = useState(null);
 
   // Parsed states
   const [parsedName, setParsedName] = useState("");
@@ -287,6 +288,18 @@ export default function SakuVoice({
     e.preventDefault();
     if (!parsedName || !parsedAmount || !parsedWalletId || !parsedCategoryId) return;
 
+    const txAmount = parseFloat(parsedAmount);
+    if (parsedType === "expense") {
+      const selectedWallet = wallets.find(w => (w._id === parsedWalletId || w.id === parsedWalletId));
+      if (selectedWallet && selectedWallet.balance < txAmount) {
+        setErrorModal({
+          title: "Saldo Tidak Cukup",
+          message: `Saldo ${selectedWallet.name} Anda (${new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(selectedWallet.balance)}) tidak mencukupi untuk melakukan transaksi sebesar ${new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(txAmount)}.`
+        });
+        return;
+      }
+    }
+
     onSubmitTransaction({
       name: parsedName.trim(),
       amount: String(parsedAmount),
@@ -505,6 +518,24 @@ export default function SakuVoice({
           )}
         </div>
       </div>
+
+      {errorModal && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md z-[60] flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden animate-slide-up text-center border border-slate-100 p-6">
+            <div className="w-16 h-16 bg-rose-50 rounded-full flex items-center justify-center mx-auto mb-4">
+              <span className="text-rose-500 text-2xl font-bold">⚠️</span>
+            </div>
+            <h3 className="font-extrabold text-lg text-slate-800 mb-2">{errorModal.title}</h3>
+            <p className="text-sm text-slate-500 mb-6">{errorModal.message}</p>
+            <button
+              onClick={() => setErrorModal(null)}
+              className="w-full bg-[#00bf71] hover:bg-[#00a862] text-white font-extrabold py-3 rounded-full transition-all cursor-pointer shadow-md text-xs"
+            >
+              Tutup
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

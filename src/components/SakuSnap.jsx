@@ -31,6 +31,7 @@ export default function SakuSnap({
   const [selectedCategoryId, setSelectedCategoryId] = useState("");
   const [savedTransaction, setSavedTransaction] = useState(null);
   const [isSavedConfirmed, setIsSavedConfirmed] = useState(false);
+  const [errorModal, setErrorModal] = useState(null);
 
   // Split bill states
   const [friends, setFriends] = useState(["Saya", "Budi", "Siti"]);
@@ -198,6 +199,18 @@ export default function SakuSnap({
 
         // Post transaction automatically to /transaction
         try {
+          const expenseAmount = parseFloat(res.data.amount || 0);
+          const defaultWallet = wallets.find(w => (w._id === initialWalletId || w.id === initialWalletId));
+          if (defaultWallet && defaultWallet.balance < expenseAmount) {
+            setErrorModal({
+              title: "Saldo Tidak Cukup",
+              message: `Saldo ${defaultWallet.name} Anda (${formatIDR(defaultWallet.balance)}) tidak mencukupi untuk menyimpan struk ini sebesar ${formatIDR(expenseAmount)}.`
+            });
+            setStep("capture");
+            setPhotoUrl(null);
+            return;
+          }
+
           const postRes = await apiRequest("/transaction", {
             method: "POST",
             body: {
@@ -320,6 +333,16 @@ export default function SakuSnap({
 
   const handleSaveTransaction = async () => {
     if (!selectedWalletId || !selectedCategoryId) return;
+
+    const selectedWallet = wallets.find(w => (w._id === selectedWalletId || w.id === selectedWalletId));
+    const expenseAmount = parseFloat(ocrData.total);
+    if (selectedWallet && selectedWallet.balance < expenseAmount) {
+      setErrorModal({
+        title: "Saldo Tidak Cukup",
+        message: `Saldo ${selectedWallet.name} Anda (${formatIDR(selectedWallet.balance)}) tidak mencukupi untuk melakukan transaksi sebesar ${formatIDR(expenseAmount)}.`
+      });
+      return;
+    }
 
     const txId = savedTransaction ? (savedTransaction._id || savedTransaction.id) : null;
     const body = {
@@ -670,6 +693,24 @@ export default function SakuSnap({
           </div>
         )}
       </div>
+
+      {errorModal && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md z-[60] flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden animate-slide-up text-center border border-slate-100 p-6">
+            <div className="w-16 h-16 bg-rose-50 rounded-full flex items-center justify-center mx-auto mb-4">
+              <span className="text-rose-500 text-2xl font-bold">⚠️</span>
+            </div>
+            <h3 className="font-extrabold text-lg text-slate-800 mb-2">{errorModal.title}</h3>
+            <p className="text-sm text-slate-500 mb-6">{errorModal.message}</p>
+            <button
+              onClick={() => setErrorModal(null)}
+              className="w-full bg-[#00bf71] hover:bg-[#00a862] text-white font-extrabold py-3 rounded-full transition-all cursor-pointer shadow-md text-xs"
+            >
+              Tutup
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
